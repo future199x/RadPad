@@ -344,9 +344,14 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         return super.onKeyUp(keyCode, event)
     }
 
+    override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        FloatingHUDManager.activeEngine = engine
+        updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+    }
+
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-        engine.resetState()
         engine.resetTracking()
         lastStickX = 0f
         lastStickY = 0f
@@ -355,7 +360,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        engine.resetState()
+        engine.backToBaseLayer()
         engine.resetTracking()
         ThemeManager.unregister(this)
         if (FloatingHUDManager.activeEngine === engine) {

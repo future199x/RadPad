@@ -168,8 +168,25 @@ class InputEngine {
     // Current bitmask accumulated from controller button & trigger events
     var currentButtonMask: Int = 0
 
-    var currentLayer: Layer = Layer.BASE
-        private set
+    private var fallbackLayer: Layer = Layer.BASE
+
+    var currentLayer: Layer
+        get() {
+            if (isNativeLoaded) {
+                try {
+                    return Layer.fromId(getCurrentLayer())
+                } catch (_: UnsatisfiedLinkError) {}
+            }
+            return fallbackLayer
+        }
+        set(value) {
+            fallbackLayer = value
+            if (isNativeLoaded) {
+                try {
+                    setCurrentLayer(value.id)
+                } catch (_: UnsatisfiedLinkError) {}
+            }
+        }
 
     var isSecondLayerActive: Boolean = false
         private set
@@ -245,18 +262,19 @@ class InputEngine {
 
     fun backToBaseLayer() {
         currentLayer = Layer.BASE
-        if (isNativeLoaded) {
-            try {
-                backToBase()
-            } catch (_: UnsatisfiedLinkError) {}
-        }
     }
 
     fun setLayer(layer: Layer) {
         currentLayer = layer
+    }
+
+    fun resetAll() {
+        currentLayer = Layer.BASE
+        isDeflected = false
+        aimedSlice = 0
         if (isNativeLoaded) {
             try {
-                setCurrentLayer(layer.id)
+                resetState()
             } catch (_: UnsatisfiedLinkError) {}
         }
     }
@@ -272,8 +290,6 @@ class InputEngine {
         if (isNativeLoaded) {
             try {
                 val rawResult = select(currentButtonMask)
-                val newLayerId = getCurrentLayer()
-                currentLayer = Layer.fromId(newLayerId)
                 return decode(rawResult)
             } catch (_: UnsatisfiedLinkError) {}
         }

@@ -22,7 +22,7 @@ import android.widget.TextView
 /**
  * MainActivity: Diagnostic Controller Detector, Live Radial Dial Telemetry, and Setup.
  */
-class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.ThemeListener {
+class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.ThemeListener, FloatingHUDManager.Listener {
 
     private lateinit var tvStatus: TextView
     private lateinit var tvDetail: TextView
@@ -31,7 +31,9 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
     private var radialHUD: KinematicRadialHUDView? = null
     private var inputManager: InputManager? = null
 
-    private val engine = InputEngine()
+    private val localEngine = InputEngine()
+    private val engine: InputEngine
+        get() = FloatingHUDManager.activeEngine ?: localEngine
 
     private var currentX: Float = 0f
     private var currentY: Float = 0f
@@ -139,9 +141,35 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
 
         inputManager = getSystemService(Context.INPUT_SERVICE) as? InputManager
         inputManager?.registerInputDeviceListener(this, null)
+        FloatingHUDManager.register(this)
 
         detectConnectedControllers()
         refreshRadialHUD()
+    }
+
+    override fun onStateUpdated(
+        x: Float,
+        y: Float,
+        layer: InputEngine.Layer,
+        secondLayer: Boolean,
+        shift: Boolean,
+        ctrl: Boolean,
+        alt: Boolean,
+        caps: Boolean,
+        superKey: Boolean
+    ) {
+        runOnUiThread {
+            currentX = x
+            currentY = y
+            currentLayer = layer
+            isSecondLayer = secondLayer
+            isShift = shift
+            isCtrl = ctrl
+            isAlt = alt
+            isCaps = caps
+            isSuper = superKey
+            radialHUD?.updateState(x, y, layer, secondLayer, shift, ctrl, alt, caps, superKey)
+        }
     }
 
     override fun onThemeChanged(theme: ThemeManager.ColorScheme) {
@@ -160,6 +188,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         super.onDestroy()
         inputManager?.unregisterInputDeviceListener(this)
         ThemeManager.unregister(this)
+        FloatingHUDManager.unregister(this)
     }
 
     private fun toggleFloatingHUD() {
@@ -228,7 +257,6 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         isSecondLayer = engine.isSecondLayerActive
 
         radialHUD?.updateState(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
-        FloatingHUDManager.updateInput(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
     }
 
     private fun onDpadAction(dir: String) {
@@ -328,9 +356,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 engine.backToBaseLayer()
                 tvLiveInput.text = "L1 Back: Returned to BASE"
                 handled = true
-            }
-            KeyEvent.KEYCODE_BUTTON_B -> handled = true
-            KeyEvent.KEYCODE_BUTTON_L2 -> {
+
                 isL2ButtonDown = true
                 isShift = true
             }
@@ -353,9 +379,10 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             KeyEvent.KEYCODE_DPAD_UP -> onDpadAction("↑ Up")
             KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction("↓ Down")
             KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_BUTTON_B,
             KeyEvent.KEYCODE_BUTTON_X,
             KeyEvent.KEYCODE_BUTTON_Y -> {
-                handled = true
+                handled = false
             }
             else -> handled = false
         }
@@ -369,8 +396,11 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         tvStatus.text = "🎮 Controller Signal Detected! (${event.device?.name ?: "Gamepad"})"
         tvStatus.setTextColor(0xFF9ECE6A.toInt())
 
-        refreshRadialHUD()
-        return if (handled) true else super.onKeyDown(keyCode, event)
+        if (handled) {
+            refreshRadialHUD()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
@@ -396,17 +426,22 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_R1,
-            KeyEvent.KEYCODE_BUTTON_L1,
+            KeyEvent.KEYCODE_BUTTON_L1 -> {
+                handled = true
+            }
             KeyEvent.KEYCODE_BUTTON_B,
             KeyEvent.KEYCODE_BUTTON_A,
             KeyEvent.KEYCODE_BUTTON_X,
             KeyEvent.KEYCODE_BUTTON_Y -> {
-                handled = true
+                handled = false
             }
             else -> handled = false
         }
-        refreshRadialHUD()
-        return if (handled) true else super.onKeyUp(keyCode, event)
+        if (handled) {
+            refreshRadialHUD()
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onInputDeviceAdded(deviceId: Int) { detectConnectedControllers() }
