@@ -577,12 +577,23 @@ class InputEngine {
             }
         }
 
-        // 2. Analog triggers: Left Trigger (L2) is Shift, Right Trigger (R2) is 2nd layer hold
-        val l2Pressure = event.getAxisValue(MotionEvent.AXIS_LTRIGGER).let {
-            if (it != 0.0f) it else event.getAxisValue(MotionEvent.AXIS_BRAKE)
+        // 2. Analog triggers: Left Trigger (L2) is Shift, Right Trigger (R2) is Mouse Layer
+        val hasLTrigger = event.device?.getMotionRange(MotionEvent.AXIS_LTRIGGER) != null
+        val l2Pressure = if (hasLTrigger) {
+            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
+        } else if (event.device?.getMotionRange(MotionEvent.AXIS_BRAKE) != null) {
+            event.getAxisValue(MotionEvent.AXIS_BRAKE)
+        } else {
+            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
         }
-        val r2Pressure = event.getAxisValue(MotionEvent.AXIS_RTRIGGER).let {
-            if (it != 0.0f) it else event.getAxisValue(MotionEvent.AXIS_GAS)
+
+        val hasRTrigger = event.device?.getMotionRange(MotionEvent.AXIS_RTRIGGER) != null
+        val r2Pressure = if (hasRTrigger) {
+            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
+        } else if (event.device?.getMotionRange(MotionEvent.AXIS_GAS) != null) {
+            event.getAxisValue(MotionEvent.AXIS_GAS)
+        } else {
+            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
         }
 
         l2TriggerActive = if (l2TriggerActive) l2Pressure >= 0.25f else l2Pressure >= TRIGGER_ENGAGEMENT_THRESHOLD
@@ -655,10 +666,14 @@ class InputEngine {
             return true
         }
 
-        // R2: Hold for 2nd layer
+        // R2: Hold for Mouse Layer
         if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
             isR2ButtonDown = isDown
-            currentButtonMask = if (isR2ButtonDown || r2TriggerActive) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
+            if (!isDown) {
+                r2TriggerActive = false
+            }
+            val r2Active = isR2ButtonDown || r2TriggerActive
+            currentButtonMask = if (r2Active) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
             if (isNativeLoaded) {
                 try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
             }

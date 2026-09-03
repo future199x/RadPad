@@ -539,11 +539,31 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             lastHatY = hatY
         }
 
-        val l2Val = event.getAxisValue(MotionEvent.AXIS_LTRIGGER).let { if (it != 0f) it else event.getAxisValue(MotionEvent.AXIS_BRAKE) }
-        val r2Val = event.getAxisValue(MotionEvent.AXIS_RTRIGGER).let { if (it != 0f) it else event.getAxisValue(MotionEvent.AXIS_GAS) }
+        val hasLTrigger = event.device?.getMotionRange(MotionEvent.AXIS_LTRIGGER) != null
+        val l2Val = if (hasLTrigger) {
+            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
+        } else if (event.device?.getMotionRange(MotionEvent.AXIS_BRAKE) != null) {
+            event.getAxisValue(MotionEvent.AXIS_BRAKE)
+        } else {
+            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
+        }
+
+        val hasRTrigger = event.device?.getMotionRange(MotionEvent.AXIS_RTRIGGER) != null
+        val r2Val = if (hasRTrigger) {
+            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
+        } else if (event.device?.getMotionRange(MotionEvent.AXIS_GAS) != null) {
+            event.getAxisValue(MotionEvent.AXIS_GAS)
+        } else {
+            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
+        }
 
         l2TriggerActive = if (l2TriggerActive) l2Val >= 0.25f else l2Val >= 0.5f
         r2TriggerActive = if (r2TriggerActive) r2Val >= 0.25f else r2Val >= 0.5f
+
+        isShift = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+        isSecondLayer = engine.isSecondLayerActive
+
+        engine.onMotionEvent(event)
 
         val isMouseActive = isR2ButtonDown || r2TriggerActive
         val wasMouseActive = VirtualMouseManager.isMouseLayerActive
@@ -591,11 +611,6 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             else if (hatY > 0.5f) onDpadAction("↓ Down")
             lastHatY = hatY
         }
-
-        isShift = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
-        isSecondLayer = engine.isSecondLayerActive
-
-        engine.onMotionEvent(event)
 
         val activeMods = mutableListOf<String>()
         if (isCaps) activeMods.add("CAPS")
@@ -732,6 +747,8 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             }
             KeyEvent.KEYCODE_BUTTON_R2 -> {
                 isR2ButtonDown = false
+                r2TriggerActive = false
+                engine.onKeyEvent(keyCode, isDown = false)
                 VirtualMouseManager.setMouseLayerActive(this, false)
                 tvLiveInput.text = "Mouse Layer Deactivated"
                 handled = true

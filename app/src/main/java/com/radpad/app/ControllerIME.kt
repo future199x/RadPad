@@ -87,18 +87,21 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         lastStickX = rx
         lastStickY = ry
 
-        // Check if R2 trigger engaged
+        // 1. Process motion event first so triggers and stick state are updated in engine
+        val result = engine.onMotionEvent(event)
+
+        // 2. Check if Mouse Layer state changed
         val wasMouseActive = VirtualMouseManager.isMouseLayerActive
         val isMouseActive = engine.isMouseLayerActive
         if (wasMouseActive != isMouseActive) {
             VirtualMouseManager.setMouseLayerActive(this, isMouseActive)
         }
 
-        // D-Pad Hat Navigation
+        // 3. D-Pad Hat Navigation
         val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
 
-        if (engine.isMouseLayerActive) {
+        if (isMouseActive) {
             VirtualMouseManager.updateStick(rx, ry)
 
             if (hatX != lastHatX) {
@@ -136,8 +139,6 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             lastHatY = hatY
         }
 
-        // Process motion event (motion alone never emits characters)
-        val result = engine.onMotionEvent(event)
         if (result != null) {
             engine.dispatchEvent(currentInputConnection, result)
             updateHud(lastEvent = result, x = lastStickX, y = lastStickY)
