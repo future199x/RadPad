@@ -38,7 +38,6 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
     private var badgeCtrl: TextView? = null
     private var badgeAlt: TextView? = null
     private var badgeSuper: TextView? = null
-    private var tvCheatsheet: TextView? = null
     private var radialHUD: KinematicRadialHUDView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
@@ -77,12 +76,10 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         badgeCtrl = floatingView?.findViewById(R.id.hud_badge_ctrl)
         badgeAlt = floatingView?.findViewById(R.id.hud_badge_alt)
         badgeSuper = floatingView?.findViewById(R.id.hud_badge_super)
-        tvCheatsheet = floatingView?.findViewById(R.id.tv_floating_cheatsheet)
         radialHUD = floatingView?.findViewById(R.id.floating_radial_hud)
         val header = floatingView?.findViewById<View>(R.id.floating_header)
 
         MacroManager.init(this)
-        tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
 
         VirtualMouseManager.register(mouseListener)
 
@@ -182,7 +179,6 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
 
             tvTitle?.setTextColor(theme.headerText)
             closeBtn?.setTextColor(theme.closeButtonColor)
-            tvCheatsheet?.setTextColor(theme.inactiveText)
 
             radialHUD?.applyColorScheme(theme)
 
@@ -215,11 +211,9 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             if (isMouse) {
                 tvMode?.visibility = View.GONE
                 tvTitle?.text = "🐭 MOUSE MODE"
-                tvCheatsheet?.text = "← L-Click | → R-Click | ↑ Mid"
             } else {
                 tvMode?.visibility = View.VISIBLE
                 tvTitle?.text = "⠿ RADPAD"
-                tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
 
                 val modeLabel = when (layer) {
                     InputEngine.Layer.BASE -> "BASE"
@@ -301,11 +295,9 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                 if (active) {
                     tvMode?.visibility = View.GONE
                     tvTitle?.text = "🐭 MOUSE MODE"
-                    tvCheatsheet?.text = "← L-Click | → R-Click | ↑ Mid"
                 } else {
                     tvMode?.visibility = View.VISIBLE
                     tvTitle?.text = "⠿ RADPAD"
-                    tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
                 }
                 radialHUD?.invalidate()
             }

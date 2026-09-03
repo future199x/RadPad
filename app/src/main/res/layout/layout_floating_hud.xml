@@ -146,15 +146,4 @@
         android:layout_height="170dp"
         android:layout_marginVertical="2dp" />
 
-    <!-- Compact Button Cheatsheet -->
-    <TextView
-        android:id="@+id/tv_floating_cheatsheet"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="▢ ⌫ • ✕ ␣ • △ ↵ • ○ ⇥"
-        android:textColor="#BAC2DE"
-        android:textSize="9sp"
-        android:textStyle="bold" />
-
 </LinearLayout>
