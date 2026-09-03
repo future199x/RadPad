@@ -80,4 +80,31 @@ object FloatingHUDManager {
             listener.onStateUpdated(x, y, layer, secondLayer, shift, ctrl, alt, caps, superKey)
         }
     }
+
+    /**
+     * Toggles the always-on floating overlay. If overlay permission is not granted,
+     * launches the Android system overlay permission screen.
+     * Returns true if overlay was started, false if stopped or permission needed.
+     */
+    fun toggleFloater(context: android.content.Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(context)) {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:${context.packageName}")
+            ).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            return false
+        }
+
+        val serviceIntent = android.content.Intent(context, FloatingHUDService::class.java)
+        return if (FloatingHUDService.isRunning) {
+            context.stopService(serviceIntent)
+            false
+        } else {
+            context.startService(serviceIntent)
+            true
+        }
+    }
 }

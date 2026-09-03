@@ -103,13 +103,13 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
 
         // Select Button Action Setting Spinner
         val spnSelectAction = findViewById<Spinner>(R.id.spn_select_action)
-        val selectActions = arrayOf("Paste from Clipboard", "Super (Windows) Key", "Real Forward Delete (DEL)")
-        val selectActionKeys = arrayOf("paste", "super", "delete")
+        val selectActions = arrayOf("Toggle Floating Overlay", "Paste from Clipboard", "Super (Windows) Key", "Real Forward Delete (DEL)")
+        val selectActionKeys = arrayOf("floater", "paste", "super", "delete")
         val selectAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, selectActions).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
         spnSelectAction.adapter = selectAdapter
-        val currentAction = prefs.getString("select_button_action", "paste")
+        val currentAction = prefs.getString("select_button_action", "floater")
         val selectIdx = selectActionKeys.indexOf(currentAction).coerceAtLeast(0)
         spnSelectAction.setSelection(selectIdx)
 
@@ -554,9 +554,14 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-                if (prefs.getString("select_button_action", "paste") == "super") {
-                    isSuper = true
+                val action = prefs.getString("select_button_action", "floater")
+                when (action) {
+                    "super" -> isSuper = true
+                    "delete" -> {}
+                    "paste" -> {}
+                    else -> toggleFloatingHUD()
                 }
+                tvLiveInput.text = "Select Button -> Action: $action"
                 handled = true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> onDpadAction("← Left")

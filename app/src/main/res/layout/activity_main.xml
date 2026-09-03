@@ -186,7 +186,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Choose button action: Paste from Clipboard, Super (Windows) Key, or Real Forward Delete (DEL)."
+                android:text="Choose button action: Toggle Floating Overlay (Default), Paste from Clipboard, Super (Windows) Key, or Real Forward Delete (DEL)."
                 android:textColor="#888B9E"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -685,7 +685,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select: Paste / Super (Win) / Delete (Choose in Settings above)\n• Options / Start: Hide keyboard"
+                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select: Toggle Floating Overlay (Default, or Paste / Super / Delete in Settings)\n• Options / Start: Hide keyboard"
                 android:textColor="#C0CAF5"
                 android:textSize="12sp" />
         </LinearLayout>

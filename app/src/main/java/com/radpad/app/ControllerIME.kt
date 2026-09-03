@@ -294,10 +294,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 return true
             }
 
-            // Share / Select: Paste / Super / Delete based on settings
+            // Share / Select: Toggle Floating Overlay (Default), or Paste / Super / Delete based on settings
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-                val selectAction = prefs.getString("select_button_action", "paste")
+                val selectAction = prefs.getString("select_button_action", "floater")
                 when (selectAction) {
                     "super" -> {
                         val mask = engine.currentButtonMask
@@ -316,12 +316,17 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                         }
                         hudStatus?.text = "Emitted: 'DEL (Forward)'"
                     }
-                    else -> {
+                    "paste" -> {
                         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                         val clip = clipboard?.primaryClip?.getItemAt(0)?.text
                         if (!clip.isNullOrEmpty()) {
                             currentInputConnection?.commitText(clip, 1)
                         }
+                        hudStatus?.text = "Emitted: 'PASTE'"
+                    }
+                    else -> {
+                        val isShown = FloatingHUDManager.toggleFloater(this)
+                        hudStatus?.text = if (isShown) "Overlay: Visible" else "Overlay: Hidden"
                     }
                 }
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
