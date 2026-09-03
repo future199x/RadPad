@@ -12,15 +12,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * KinematicRadialHUDView: Visual radial dial displaying the active layer,
- * 8 directional slice cones, live stick targeting reticle, and center status indicators.
- *
- * Implements:
- * - Base Layer preview text on all 8 sectors (A-H, SYM, I-P, FN, Q-X, Y-Z, NUM, SYS).
- * - Layer-specific sector rendering for all sublayers.
- * - Dynamic secondary-tier switching when R2 is held (SYM 2, NUM 9-0, FN 9-12).
- * - System Layer with active center "VOL TOGGLE" targeting in the deadzone.
- * - Both equal 45° sectors (Symmetric) and asymmetric cones (60° cardinals, 30° diagonals).
+ * KinematicRadialHUDView: Hardware-accelerated radial controller dial.
  */
 class KinematicRadialHUDView @JvmOverloads constructor(
     context: Context,
@@ -35,7 +27,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         const val DEADZONE_RELEASE: Float = 0.25f
         const val DEADZONE_RELEASE_SQ: Float = DEADZONE_RELEASE * DEADZONE_RELEASE
 
-        val BASE_PREVIEW_LABELS = arrayOf("A-H", "SYM", "I-P", "FN", "Q-X", "Y-Z", "NUM", "SYS")
+        val BASE_PREVIEW_LABELS = arrayOf("A-H", "SYM", "I-P", "FN", "Q-Z", "MACRO", "NUM", "SYS")
 
         val SYMMETRIC_START_ANGLES = floatArrayOf(247.5f, 292.5f, 337.5f, 22.5f, 67.5f, 112.5f, 157.5f, 202.5f)
         val SYMMETRIC_SWEEP_ANGLES = floatArrayOf(45f, 45f, 45f, 45f, 45f, 45f, 45f, 45f)
@@ -78,7 +70,6 @@ class KinematicRadialHUDView @JvmOverloads constructor(
             field = value
             invalidate()
         }
-
 
     // State properties
     private var stickX: Float = 0f
@@ -173,6 +164,12 @@ class KinematicRadialHUDView @JvmOverloads constructor(
     init {
         ThemeManager.init(context)
         applyColorScheme(ThemeManager.currentTheme)
+        MacroManager.init(context)
+        MacroManager.registerListener(object : MacroManager.Listener {
+            override fun onMacrosChanged() {
+                invalidate()
+            }
+        })
     }
 
     fun applyColorScheme(theme: ThemeManager.ColorScheme) {
@@ -191,9 +188,6 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         invalidate()
     }
 
-    /**
-     * Updates analog stick deflection and layer states.
-     */
     fun updateState(
         x: Float,
         y: Float,
@@ -235,7 +229,6 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         invalidate()
     }
-
 
     private fun calculateSlice(x: Float, y: Float): Int {
         val rad = atan2(x.toDouble(), -y.toDouble())
@@ -281,23 +274,27 @@ class KinematicRadialHUDView @JvmOverloads constructor(
                 if (effectiveShift) base.map { it.uppercase() }.toTypedArray() else base
             }
 
-            InputEngine.Layer.Q_X -> {
-                val base = arrayOf("q", "r", "s", "t", "u", "v", "w", "x")
-                if (effectiveShift) base.map { it.uppercase() }.toTypedArray() else base
+            InputEngine.Layer.Q_Z -> {
+                if (isSecondLayer) {
+                    val base = arrayOf("y", "z", "", "", "", "", "", "")
+                    if (effectiveShift) base.map { if (it.isNotEmpty()) it.uppercase() else "" }.toTypedArray() else base
+                } else {
+                    val base = arrayOf("q", "r", "s", "t", "u", "v", "w", "x")
+                    if (effectiveShift) base.map { it.uppercase() }.toTypedArray() else base
+                }
             }
 
-            InputEngine.Layer.Y_Z -> {
-                val base = arrayOf("y", "z", "", "", "", "", "", "")
-                if (effectiveShift) base.map { if (it.isNotEmpty()) it.uppercase() else "" }.toTypedArray() else base
+            InputEngine.Layer.MACRO -> {
+                MacroManager.getMacroLabels()
             }
 
             InputEngine.Layer.MORE_SYM -> {
                 if (isSecondLayer) {
-                    // SYM 2 (Hold R2): North='`', East=']', West='['
+                    // SYM 2: North='`', East=']', West='['
                     if (effectiveShift) arrayOf("~", "", "}", "", "", "", "{", "")
                     else arrayOf("`", "", "]", "", "", "", "[", "")
                 } else {
-                    // SYM 1: North='\'', NE='=', East='.', SE=';', South='\\', SW='/', West=',', NW='-'
+                    // SYM 1: North=''', NE='=', East='.', SE=';', South='\', SW='/', West=',', NW='-'
                     if (effectiveShift) arrayOf("\"", "+", ">", ":", "|", "?", "<", "_")
                     else arrayOf("'", "=", ".", ";", "\\", "/", ",", "-")
                 }
@@ -305,7 +302,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
             InputEngine.Layer.NUM_SYM -> {
                 if (isSecondLayer) {
-                    // 9-0 (Hold R2): North='9', NE='0'
+                    // 9-0: North='9', NE='0'
                     if (effectiveShift) arrayOf("(", ")", "", "", "", "", "", "")
                     else arrayOf("9", "0", "", "", "", "", "", "")
                 } else {
@@ -332,11 +329,11 @@ class KinematicRadialHUDView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val width = width.toFloat()
-        val height = height.toFloat()
-        val centerX = width / 2f
-        val centerY = height / 2f
-        val radius = (minOf(width, height) / 2f) * 0.90f
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val centerX = w / 2f
+        val centerY = h / 2f
+        val radius = (Math.min(w, h) / 2f) * 0.95f
         val deadzoneRadius = radius * DEADZONE_ENGAGE
 
         outerRect.set(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
@@ -380,7 +377,11 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         // 5. Draw center deadzone circle
         val isSysDeadzoneTargeted = (currentLayer == InputEngine.Layer.SYS && targetedSlice == -1)
-        if (isSysDeadzoneTargeted) {
+        val isPageToggleTargeted = (targetedSlice == -1 && currentLayer in listOf(
+            InputEngine.Layer.Q_Z, InputEngine.Layer.MORE_SYM, InputEngine.Layer.NUM_SYM, InputEngine.Layer.FN
+        ))
+
+        if (isSysDeadzoneTargeted || isPageToggleTargeted) {
             canvas.drawCircle(centerX, centerY, deadzoneRadius, activeSliceFillPaint)
             canvas.drawCircle(centerX, centerY, deadzoneRadius, activeSliceStrokePaint)
         } else {
@@ -423,8 +424,8 @@ class KinematicRadialHUDView @JvmOverloads constructor(
                     1 -> "MORE SYM"
                     2 -> "I - P"
                     3 -> "FN (1-12)"
-                    4 -> "Q - X"
-                    5 -> "Y - Z"
+                    4 -> "Q - Z"
+                    5 -> "MACRO"
                     6 -> "NUMBERS"
                     7 -> "SYSTEM"
                     else -> "RADPAD"
@@ -441,25 +442,37 @@ class KinematicRadialHUDView @JvmOverloads constructor(
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
+            InputEngine.Layer.Q_Z -> {
+                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ Q - X ◀" else "▶ Y - Z ◀") else (if (isSecondLayer) "Y - Z (2/2)" else "Q - X (1/2)")
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
+                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
+            }
+
             InputEngine.Layer.MORE_SYM -> {
-                val title = if (isSecondLayer) "SYM 2" else "SYM 1"
-                val sub = if (isSecondLayer) "L1: BASE" else "HOLD R2: 2ND"
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), centerInfoPaint)
+                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ SYM 1 ◀" else "▶ SYM 2 ◀") else (if (isSecondLayer) "SYM 2 (2/2)" else "SYM 1 (1/2)")
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             InputEngine.Layer.NUM_SYM -> {
-                val title = if (isSecondLayer) "9 - 0" else "1 - 8"
-                val sub = if (isSecondLayer) "L1: BASE" else "HOLD R2: 9-0"
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), centerInfoPaint)
+                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ 1 - 8 ◀" else "▶ 9 - 0 ◀") else (if (isSecondLayer) "9 - 0 (2/2)" else "1 - 8 (1/2)")
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             InputEngine.Layer.FN -> {
-                val title = if (isSecondLayer) "FN 9-12" else "FN 1-8"
-                val sub = if (isSecondLayer) "L1: BASE" else "HOLD R2: 9-12"
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), centerInfoPaint)
+                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ FN 1-8 ◀" else "▶ FN 9-12 ◀") else (if (isSecondLayer) "FN 9-12 (2/2)" else "FN 1-8 (1/2)")
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
+            }
+
+            InputEngine.Layer.MACRO -> {
+                canvas.drawText("MACROS", centerX, centerY - (radius * 0.04f), centerInfoPaint)
+                canvas.drawText("L1: BASE", centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             else -> {

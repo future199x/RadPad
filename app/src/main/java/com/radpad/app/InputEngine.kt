@@ -1,22 +1,15 @@
 package com.radpad.app
 
+import android.content.Context
+import android.os.SystemClock
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.inputmethod.InputConnection
 import kotlin.math.atan2
 
 /**
- * InputEngine: Zero-latency radial input engine communicating directly with bare-metal Zig core
- * (`libzigengine.so`), with seamless pure-Kotlin fallback for host JVM testing.
- *
- * Implements:
- * - Two-stage radial selection architecture matching the architecture diagram.
- * - Stick movement aims/highlights sectors without flick emission.
- * - Right Bumper (R1) commits selection (enters layer from BASE, or emits character in layer).
- * - Left Bumper (L1) returns to BASE layer.
- * - Right Trigger (R2) holds secondary layer when in layers with two tiers (SYM 2, 9-0, FN 9-12).
- * - Left Trigger (L2) holds Shift.
- * - Full system key dispatch (Vol+, Vol-, Vol Mute/Toggle, PgUp, PgDn, Home, End, Del, Ins).
+ * InputEngine: Bare-metal bridge to the zero-latency Zig radial input engine.
  */
 class InputEngine {
 
@@ -26,8 +19,8 @@ class InputEngine {
         MORE_SYM(2, "SYM"),
         I_P(3, "I-P"),
         FN(4, "FN"),
-        Q_X(5, "Q-X"),
-        Y_Z(6, "Y-Z"),
+        Q_Z(5, "Q-Z"),
+        MACRO(6, "MACRO"),
         NUM_SYM(7, "NUM"),
         SYS(8, "SYS");
 
@@ -58,8 +51,7 @@ class InputEngine {
         const val FLAG_SELECT: Int = 1 shl 8    // Right Bumper (R1): Select Layer / Character
         const val FLAG_BACK: Int = 1 shl 9      // Left Bumper (L1): Return to Base Layer
 
-
-        // Special Key Codes (Matching main.zig: 0xF001 .. 0xF016)
+        // Special Key Codes (Matching main.zig: 0xF001 .. 0xF027)
         const val KEY_F1: Int = 0xF001
         const val KEY_F2: Int = 0xF002
         const val KEY_F3: Int = 0xF003
@@ -83,7 +75,18 @@ class InputEngine {
         const val KEY_VOL_DOWN: Int = 0xF015
         const val KEY_VOL_MUTE: Int = 0xF016
 
+        // Macro keys (0xF020 .. 0xF027)
+        const val KEY_MACRO_0: Int = 0xF020
+        const val KEY_MACRO_1: Int = 0xF021
+        const val KEY_MACRO_2: Int = 0xF022
+        const val KEY_MACRO_3: Int = 0xF023
+        const val KEY_MACRO_4: Int = 0xF024
+        const val KEY_MACRO_5: Int = 0xF025
+        const val KEY_MACRO_6: Int = 0xF026
+        const val KEY_MACRO_7: Int = 0xF027
+
         const val LAYER_EVENT_MASK: Int = 0xE000
+        const val PAGE_TOGGLE_EVENT_MASK: Int = 0xD000
 
         // Output Bitmasks
         const val CHAR_MASK: Int = 0xFFFF
@@ -104,8 +107,12 @@ class InputEngine {
         val LAYOUT_I_P = arrayOf('i', 'j', 'k', 'l', 'm', 'n', 'o', 'p')
         val LAYOUT_FN_1_8 = arrayOf(KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8)
         val LAYOUT_FN_9_12 = arrayOf(KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, 0, 0, 0)
-        val LAYOUT_Q_X = arrayOf('q', 'r', 's', 't', 'u', 'v', 'w', 'x')
-        val LAYOUT_Y_Z = arrayOf('y', 'z', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000')
+        val LAYOUT_Q_Z_1 = arrayOf('q', 'r', 's', 't', 'u', 'v', 'w', 'x')
+        val LAYOUT_Q_Z_2 = arrayOf('y', 'z', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000')
+        val LAYOUT_MACRO = arrayOf(
+            KEY_MACRO_0, KEY_MACRO_1, KEY_MACRO_2, KEY_MACRO_3,
+            KEY_MACRO_4, KEY_MACRO_5, KEY_MACRO_6, KEY_MACRO_7
+        )
         val LAYOUT_NUM_1_8 = arrayOf('1', '2', '3', '4', '5', '6', '7', '8')
         val LAYOUT_NUM_9_0 = arrayOf('9', '0', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000', '\u0000')
         val LAYOUT_SYS = arrayOf(
@@ -143,6 +150,7 @@ class InputEngine {
         fun decode(rawValue: Int): ProcessedEvent? {
             if (rawValue == 0) return null
             if ((rawValue and 0xF000) == LAYER_EVENT_MASK) return null
+            if ((rawValue and 0xF000) == PAGE_TOGGLE_EVENT_MASK) return null
             val code = rawValue and CHAR_MASK
             return ProcessedEvent(
                 rawValue = rawValue,
@@ -162,6 +170,9 @@ class InputEngine {
     external fun backToBase()
     external fun getCurrentLayer(): Int
     external fun setCurrentLayer(layerId: Int)
+    external fun isSecondPage(): Boolean
+    external fun setSecondPage(secondPage: Boolean)
+    external fun toggleSecondPage(): Boolean
     external fun resetState()
     external fun setSymmetricSlices(symmetric: Boolean)
 
@@ -188,8 +199,26 @@ class InputEngine {
             }
         }
 
-    var isSecondLayerActive: Boolean = false
-        private set
+    private var fallbackSecondPage: Boolean = false
+
+    var isSecondLayerActive: Boolean
+        get() {
+            val isR2Active = isR2ButtonDown || r2TriggerActive
+            if (isNativeLoaded) {
+                try {
+                    return isSecondPage() || isR2Active
+                } catch (_: UnsatisfiedLinkError) {}
+            }
+            return fallbackSecondPage || isR2Active
+        }
+        set(value) {
+            fallbackSecondPage = value
+            if (isNativeLoaded) {
+                try {
+                    setSecondPage(value)
+                } catch (_: UnsatisfiedLinkError) {}
+            }
+        }
 
     var lastStickX: Float = 0f
         private set
@@ -215,19 +244,29 @@ class InputEngine {
     private var leftStickCtrlActive: Boolean = false
     private var leftStickAltActive: Boolean = false
     private var leftStickSuperActive: Boolean = false
+
+    // Analog triggers
     private var l2TriggerActive: Boolean = false
     private var r2TriggerActive: Boolean = false
 
     var useSymmetricSlices: Boolean = true
+        set(value) {
+            field = value
+            if (isNativeLoaded) {
+                try {
+                    setSymmetricSlices(value)
+                } catch (_: UnsatisfiedLinkError) {}
+            }
+        }
 
     data class ProcessedEvent(
         val rawValue: Int,
         val charCode: Int,
         val char: Char,
-        val isShift: Boolean,
-        val isCtrl: Boolean,
-        val isAlt: Boolean,
-        val isSuper: Boolean
+        val isShift: Boolean = false,
+        val isCtrl: Boolean = false,
+        val isAlt: Boolean = false,
+        val isSuper: Boolean = false
     )
 
     fun calculateSlice(x: Float, y: Float): Int {
@@ -262,15 +301,18 @@ class InputEngine {
 
     fun backToBaseLayer() {
         currentLayer = Layer.BASE
+        isSecondLayerActive = false
     }
 
     fun setLayer(layer: Layer) {
         currentLayer = layer
+        isSecondLayerActive = false
     }
 
     fun resetAll() {
         currentLayer = Layer.BASE
         isDeflected = false
+        isSecondLayerActive = false
         aimedSlice = 0
         if (isNativeLoaded) {
             try {
@@ -282,7 +324,9 @@ class InputEngine {
     /**
      * Performs selection (invoked when Right Bumper R1 is pressed).
      * On BASE: transitions to targeted layer.
-     * In Layer: emits targeted character/key (or VOL MUTE if in SYS deadzone).
+     * In Layer:
+     *   - Center deadzone: Vol Mute in SYS, Page toggle in Q-Z, SYM, NUM, FN.
+     *   - Slices: emits targeted character/macro.
      */
     fun onSelect(): ProcessedEvent? {
         hasTypedDuringSuperEngaged = true
@@ -302,30 +346,33 @@ class InputEngine {
                 1 -> Layer.MORE_SYM
                 2 -> Layer.I_P
                 3 -> Layer.FN
-                4 -> Layer.Q_X
-                5 -> Layer.Y_Z
+                4 -> Layer.Q_Z
+                5 -> Layer.MACRO
                 6 -> Layer.NUM_SYM
                 7 -> Layer.SYS
                 else -> Layer.BASE
             }
+            isSecondLayerActive = false
             return null
         }
 
         // Inside active layer:
-        if (currentLayer == Layer.SYS && !isDeflected) {
-            return ProcessedEvent(
-                rawValue = KEY_VOL_MUTE,
-                charCode = KEY_VOL_MUTE,
-                char = 0.toChar(),
-                isShift = false,
-                isCtrl = false,
-                isAlt = false,
-                isSuper = false
-            )
+        if (!isDeflected) {
+            if (currentLayer == Layer.SYS) {
+                return ProcessedEvent(
+                    rawValue = KEY_VOL_MUTE,
+                    charCode = KEY_VOL_MUTE,
+                    char = 0.toChar()
+                )
+            }
+            if (currentLayer in listOf(Layer.Q_Z, Layer.MORE_SYM, Layer.NUM_SYM, Layer.FN)) {
+                fallbackSecondPage = !fallbackSecondPage
+                return null
+            }
+            return null
         }
 
-        if (!isDeflected) return null
-
+        val isSecond = isSecondLayerActive
         val isShift = ((currentButtonMask and FLAG_SHIFT) != 0) xor ((currentButtonMask and FLAG_CAPS_LOCK) != 0)
         val isCtrl = (currentButtonMask and FLAG_CTRL) != 0
         val isAlt = (currentButtonMask and FLAG_ALT) != 0
@@ -334,16 +381,20 @@ class InputEngine {
         var charCode = when (currentLayer) {
             Layer.A_H -> LAYOUT_A_H[aimedSlice].code
             Layer.I_P -> LAYOUT_I_P[aimedSlice].code
-            Layer.Q_X -> LAYOUT_Q_X[aimedSlice].code
-            Layer.Y_Z -> LAYOUT_Y_Z[aimedSlice].code
-            Layer.MORE_SYM -> if (isSecondLayerActive) LAYOUT_MORE_SYM_2[aimedSlice].code else LAYOUT_MORE_SYM_1[aimedSlice].code
-            Layer.NUM_SYM -> if (isSecondLayerActive) LAYOUT_NUM_9_0[aimedSlice].code else LAYOUT_NUM_1_8[aimedSlice].code
-            Layer.FN -> if (isSecondLayerActive) LAYOUT_FN_9_12[aimedSlice] else LAYOUT_FN_1_8[aimedSlice]
+            Layer.Q_Z -> (if (isSecond) LAYOUT_Q_Z_2[aimedSlice] else LAYOUT_Q_Z_1[aimedSlice]).code
+            Layer.MACRO -> LAYOUT_MACRO[aimedSlice]
+            Layer.MORE_SYM -> (if (isSecond) LAYOUT_MORE_SYM_2[aimedSlice] else LAYOUT_MORE_SYM_1[aimedSlice]).code
+            Layer.NUM_SYM -> (if (isSecond) LAYOUT_NUM_9_0[aimedSlice] else LAYOUT_NUM_1_8[aimedSlice]).code
+            Layer.FN -> if (isSecond) LAYOUT_FN_9_12[aimedSlice] else LAYOUT_FN_1_8[aimedSlice]
             Layer.SYS -> LAYOUT_SYS[aimedSlice]
             Layer.BASE -> 0
         }
 
         if (charCode == 0) return null
+
+        if (currentLayer == Layer.MACRO) {
+            return ProcessedEvent(charCode, charCode, charCode.toChar())
+        }
 
         var charVal = charCode.toChar()
         if (isShift) {
@@ -371,6 +422,92 @@ class InputEngine {
             isAlt = isAlt,
             isSuper = isSuper
         )
+    }
+
+    /**
+     * Process analog right stick motion.
+     */
+    fun onMotion(x: Float, y: Float): ProcessedEvent? {
+        lastStickX = x
+        lastStickY = y
+
+        val rSq = (x * x) + (y * y)
+        if (isDeflected) {
+            if (rSq < DEADZONE_RELEASE_SQ) {
+                isDeflected = false
+            } else {
+                aimedSlice = calculateSlice(x, y)
+            }
+        } else {
+            if (rSq >= DEADZONE_ENGAGE_SQ) {
+                isDeflected = true
+                aimedSlice = calculateSlice(x, y)
+            }
+        }
+
+        if (isNativeLoaded) {
+            try {
+                val rawResult = processInput(x, y, currentButtonMask)
+                return decode(rawResult)
+            } catch (_: UnsatisfiedLinkError) {}
+        }
+
+        return null
+    }
+
+    /**
+     * Process Left Stick deflection for modifier keys.
+     */
+    fun onLeftStickMotion(lx: Float, ly: Float): Boolean {
+        val ENGAGE = 0.35f
+        val RELEASE = 0.20f
+
+        val prevShift = leftStickShiftActive
+        val prevCtrl = leftStickCtrlActive
+        val prevAlt = leftStickAltActive
+        val prevSuper = leftStickSuperActive
+
+        leftStickShiftActive = if (leftStickShiftActive) ly <= -RELEASE else ly <= -ENGAGE
+        leftStickCtrlActive = if (leftStickCtrlActive) ly >= RELEASE else ly >= ENGAGE
+        leftStickAltActive = if (leftStickAltActive) lx <= -RELEASE else lx <= -ENGAGE
+        leftStickSuperActive = if (leftStickSuperActive) lx >= RELEASE else lx >= ENGAGE
+
+        if (!prevSuper && leftStickSuperActive) {
+            leftStickSuperEngaged = true
+            hasTypedDuringSuperEngaged = false
+        }
+
+        val changed = (prevShift != leftStickShiftActive) ||
+                (prevCtrl != leftStickCtrlActive) ||
+                (prevAlt != leftStickAltActive) ||
+                (prevSuper != leftStickSuperActive)
+
+        if (changed) {
+            val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+            currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
+            currentButtonMask = if (leftStickCtrlActive) currentButtonMask or FLAG_CTRL else currentButtonMask and FLAG_CTRL.inv()
+            currentButtonMask = if (leftStickAltActive) currentButtonMask or FLAG_ALT else currentButtonMask and FLAG_ALT.inv()
+            currentButtonMask = if (leftStickSuperActive) currentButtonMask or FLAG_SUPER else currentButtonMask and FLAG_SUPER.inv()
+
+            if (isNativeLoaded) {
+                try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
+            }
+        }
+        return changed
+    }
+
+    fun onLeftStickRelease(ic: InputConnection?): Boolean {
+        var dispatched = false
+        if (leftStickSuperEngaged && !hasTypedDuringSuperEngaged) {
+            val superDown = KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_META_LEFT, 0, KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)
+            val superUp = KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0, KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)
+            ic?.sendKeyEvent(superDown)
+            ic?.sendKeyEvent(superUp)
+            dispatched = true
+        }
+        leftStickSuperEngaged = false
+        hasTypedDuringSuperEngaged = false
+        return dispatched
     }
 
     /**
@@ -432,7 +569,6 @@ class InputEngine {
         currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
 
         val r2Active = isR2ButtonDown || r2TriggerActive
-        isSecondLayerActive = r2Active
         currentButtonMask = if (r2Active) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
 
         // 3. Read Right Stick (Radial Dial):
@@ -470,25 +606,6 @@ class InputEngine {
         return standaloneSuperEvent
     }
 
-    fun resetTracking() {
-        leftStickSuperEngaged = false
-        hasTypedDuringSuperEngaged = false
-        isL2ButtonDown = false
-        isR2ButtonDown = false
-        isL1ButtonDown = false
-        leftStickShiftActive = false
-        leftStickCtrlActive = false
-        leftStickAltActive = false
-        leftStickSuperActive = false
-        l2TriggerActive = false
-        r2TriggerActive = false
-        isSecondLayerActive = false
-        isDeflected = false
-    }
-
-    /**
-     * Handles hardware button state transitions (KeyDown / KeyUp).
-     */
     fun onKeyEvent(keyCode: Int, isDown: Boolean): Boolean {
         if (isDown) {
             hasTypedDuringSuperEngaged = true
@@ -497,7 +614,8 @@ class InputEngine {
         // L3: Toggle Caps Lock
         if (keyCode == KeyEvent.KEYCODE_BUTTON_THUMBL) {
             if (isDown) {
-                currentButtonMask = currentButtonMask xor FLAG_CAPS_LOCK
+                val isCaps = (currentButtonMask and FLAG_CAPS_LOCK) != 0
+                currentButtonMask = if (!isCaps) currentButtonMask or FLAG_CAPS_LOCK else currentButtonMask and FLAG_CAPS_LOCK.inv()
                 if (isNativeLoaded) {
                     try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
                 }
@@ -517,8 +635,7 @@ class InputEngine {
         // R2: Hold for 2nd layer
         if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
             isR2ButtonDown = isDown
-            isSecondLayerActive = isR2ButtonDown || r2TriggerActive
-            currentButtonMask = if (isSecondLayerActive) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
+            currentButtonMask = if (isR2ButtonDown || r2TriggerActive) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
             if (isNativeLoaded) {
                 try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
             }
@@ -539,14 +656,36 @@ class InputEngine {
         return false
     }
 
-    /**
-     * Dispatches a decoded event to the active Android InputConnection.
-     */
+    fun onTrigger(axis: Int, value: Float): Boolean {
+        val isEngaged = value >= TRIGGER_ENGAGEMENT_THRESHOLD
+        var changed = false
+
+        if (axis == MotionEvent.AXIS_BRAKE || axis == MotionEvent.AXIS_LTRIGGER) {
+            if (l2TriggerActive != isEngaged) {
+                l2TriggerActive = isEngaged
+                val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+                currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
+                changed = true
+            }
+        } else if (axis == MotionEvent.AXIS_GAS || axis == MotionEvent.AXIS_RTRIGGER) {
+            if (r2TriggerActive != isEngaged) {
+                r2TriggerActive = isEngaged
+                currentButtonMask = if (isR2ButtonDown || r2TriggerActive) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
+                changed = true
+            }
+        }
+
+        if (changed && isNativeLoaded) {
+            try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
+        }
+        return changed
+    }
+
     fun dispatchEvent(ic: InputConnection?, event: ProcessedEvent) {
         if (ic == null) return
 
         when {
-            // Standalone Super / Windows Key
+            // Standalone Super key
             event.charCode == KEY_SUPER -> {
                 var metaState = KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
                 if (event.isShift) metaState = metaState or KeyEvent.META_SHIFT_ON
@@ -656,30 +795,31 @@ class InputEngine {
                 }
             }
 
-            // Real Forward Delete Key
-            event.charCode == KEY_DELETE -> {
-                if (ic.deleteSurroundingText(0, 1) != true) {
-                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL, 0, 0))
-                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_FORWARD_DEL, 0, 0))
-                }
+            // Macro Keys (KEY_MACRO_0 through KEY_MACRO_7)
+            event.charCode in KEY_MACRO_0..KEY_MACRO_7 -> {
+                val slot = event.charCode - KEY_MACRO_0
+                MacroManager.execute(ic, slot)
             }
 
-            // Newline / Enter
-            event.char == '\n' -> {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-            }
-
-            // Tab
-            event.char == '\t' -> {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB))
-            }
-
-            // Standard character
+            // Regular character
             else -> {
                 ic.commitText(event.char.toString(), 1)
             }
         }
+    }
+
+    fun resetTracking() {
+        leftStickSuperEngaged = false
+        hasTypedDuringSuperEngaged = false
+        isL2ButtonDown = false
+        isR2ButtonDown = false
+        isL1ButtonDown = false
+        leftStickShiftActive = false
+        leftStickCtrlActive = false
+        leftStickAltActive = false
+        leftStickSuperActive = false
+        l2TriggerActive = false
+        r2TriggerActive = false
+        isDeflected = false
     }
 }

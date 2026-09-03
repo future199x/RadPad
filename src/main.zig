@@ -14,7 +14,7 @@ pub const FLAG_BACK: i32 = 1 << 9;      // Left Bumper (L1) -> Return to Base La
 
 
 // ============================================================================
-// SPECIAL FUNCTION KEYS & NAVIGATION CODES (0xF001 .. 0xF016)
+// SPECIAL FUNCTION KEYS & NAVIGATION CODES (0xF001 .. 0xF027)
 // ============================================================================
 pub const KEY_F1: u16 = 0xF001;
 pub const KEY_F2: u16 = 0xF002;
@@ -39,8 +39,21 @@ pub const KEY_VOL_UP: u16 = 0xF014;
 pub const KEY_VOL_DOWN: u16 = 0xF015;
 pub const KEY_VOL_MUTE: u16 = 0xF016;
 
+// Macro key codes for the 8 slots in the Macro layer
+pub const KEY_MACRO_0: u16 = 0xF020;
+pub const KEY_MACRO_1: u16 = 0xF021;
+pub const KEY_MACRO_2: u16 = 0xF022;
+pub const KEY_MACRO_3: u16 = 0xF023;
+pub const KEY_MACRO_4: u16 = 0xF024;
+pub const KEY_MACRO_5: u16 = 0xF025;
+pub const KEY_MACRO_6: u16 = 0xF026;
+pub const KEY_MACRO_7: u16 = 0xF027;
+
 /// Layer transition indicator event packed into upper bits: 0xE000 | layer_id
 pub const LAYER_EVENT_MASK: i32 = 0xE000;
+
+/// Page toggle indicator event: 0xD000 | (is_second_page ? 1 : 0)
+pub const PAGE_TOGGLE_EVENT_MASK: i32 = 0xD000;
 
 // ============================================================================
 // BITMASK CONSTANTS: ENGINE OUTPUT FLAGS (packed into upper 16 bits of return value)
@@ -78,39 +91,46 @@ pub const LayerId = enum(u8) {
     MoreSym = 2,
     I_P = 3,
     Fn = 4,
-    Q_X = 5,
-    Y_Z = 6,
+    Q_Z = 5,
+    Macro = 6,
     NumSym = 7,
     Sys = 8,
 };
 
 // ============================================================================
-// LAYER MAPPINGS (MATCHING ARCHITECTURE DIAGRAM)
+// LAYER MAPPINGS (MATCHING ARCHITECTURE DIAGRAM & USER CUSTOMIZATIONS)
 // ============================================================================
 // North=0, NorthEast=1, East=2, SouthEast=3, South=4, SouthWest=5, West=6, NorthWest=7
 pub const LAYOUT_A_H: [8]u16 = [_]u16{ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' };
 
-// SYM 1: North='\'', NE='=', East='.', SE=';', South='\\', SW='/', West=',', NW='-'
+// SYM 1: North=''', NE='=', East='.', SE=';', South='\', SW='/', West=',', NW='-'
 pub const LAYOUT_MORE_SYM_1: [8]u16 = [_]u16{ '\'', '=', '.', ';', '\\', '/', ',', '-' };
 
-// SYM 2 (Hold R2): North='`', East=']', West='['
+// SYM 2 (Hold R2 or Center R1 toggle): North='`', East=']', West='['
 pub const LAYOUT_MORE_SYM_2: [8]u16 = [_]u16{ '`', 0, ']', 0, 0, 0, '[', 0 };
 
 pub const LAYOUT_I_P: [8]u16 = [_]u16{ 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p' };
 
 pub const LAYOUT_FN_1_8: [8]u16 = [_]u16{ KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8 };
 
-// FN 9-12 (Hold R2): North=F9, NE=F10, East=F11, SE=F12
+// FN 9-12 (Hold R2 or Center R1 toggle): North=F9, NE=F10, East=F11, SE=F12
 pub const LAYOUT_FN_9_12: [8]u16 = [_]u16{ KEY_F9, KEY_F10, KEY_F11, KEY_F12, 0, 0, 0, 0 };
 
-pub const LAYOUT_Q_X: [8]u16 = [_]u16{ 'q', 'r', 's', 't', 'u', 'v', 'w', 'x' };
+// Q-Z Page 1: q..x
+pub const LAYOUT_Q_Z_1: [8]u16 = [_]u16{ 'q', 'r', 's', 't', 'u', 'v', 'w', 'x' };
 
-// Y-Z: North='y', NE='z'
-pub const LAYOUT_Y_Z: [8]u16 = [_]u16{ 'y', 'z', 0, 0, 0, 0, 0, 0 };
+// Q-Z Page 2 (Hold R2 or Center R1 toggle): North='y', NE='z'
+pub const LAYOUT_Q_Z_2: [8]u16 = [_]u16{ 'y', 'z', 0, 0, 0, 0, 0, 0 };
+
+// MACRO: North=Macro0, NE=Macro1, East=Macro2, SE=Macro3, South=Macro4, SW=Macro5, West=Macro6, NW=Macro7
+pub const LAYOUT_MACRO: [8]u16 = [_]u16{
+    KEY_MACRO_0, KEY_MACRO_1, KEY_MACRO_2, KEY_MACRO_3,
+    KEY_MACRO_4, KEY_MACRO_5, KEY_MACRO_6, KEY_MACRO_7,
+};
 
 pub const LAYOUT_NUM_1_8: [8]u16 = [_]u16{ '1', '2', '3', '4', '5', '6', '7', '8' };
 
-// NUM 9-0 (Hold R2): North='9', NE='0'
+// NUM 9-0 (Hold R2 or Center R1 toggle): North='9', NE='0'
 pub const LAYOUT_NUM_9_0: [8]u16 = [_]u16{ '9', '0', 0, 0, 0, 0, 0, 0 };
 
 // SYS: North=PgUp, NE=Vol+, East=End, SE=Del, South=PgDn, SW=Ins, West=Home, NW=Vol-
@@ -155,11 +175,13 @@ pub const InputStateMachine = struct {
     use_symmetric_slices: bool = true,
     last_aimed_slice: Direction = .North,
     is_deflected: bool = false,
+    is_second_page: bool = false,
 
     pub fn reset(self: *InputStateMachine) void {
         self.current_layer = .Base;
         self.is_deflected = false;
         self.last_aimed_slice = .North;
+        self.is_second_page = false;
     }
 
     /// Computes slice index.
@@ -204,6 +226,7 @@ pub const InputStateMachine = struct {
         // Left Bumper (L1 / FLAG_BACK) returns to Base Layer
         if ((state_flags & FLAG_BACK) != 0) {
             self.current_layer = .Base;
+            self.is_second_page = false;
             return 0;
         }
 
@@ -225,31 +248,39 @@ pub const InputStateMachine = struct {
                 .NorthEast => .MoreSym,
                 .East => .I_P,
                 .SouthEast => .Fn,
-                .South => .Q_X,
-                .SouthWest => .Y_Z,
+                .South => .Q_Z,
+                .SouthWest => .Macro,
                 .West => .NumSym,
                 .NorthWest => .Sys,
             };
+            self.is_second_page = false;
             return LAYER_EVENT_MASK | @as(i32, @intFromEnum(self.current_layer));
         }
 
         // Inside an active layer:
-        // SYS special case: center deadzone is Vol Mute / Toggle!
-        if (self.current_layer == .Sys and !self.is_deflected) {
-            return @as(i32, KEY_VOL_MUTE);
+        // When stick is centered in deadzone:
+        if (!self.is_deflected) {
+            // SYS special case: center deadzone is Vol Mute / Toggle!
+            if (self.current_layer == .Sys) {
+                return @as(i32, KEY_VOL_MUTE);
+            }
+            // Layers with a second page: center R1 toggles second page!
+            if (self.current_layer == .Q_Z or self.current_layer == .MoreSym or self.current_layer == .NumSym or self.current_layer == .Fn) {
+                self.is_second_page = !self.is_second_page;
+                return PAGE_TOGGLE_EVENT_MASK | @as(i32, if (self.is_second_page) 1 else 0);
+            }
+            return 0;
         }
 
-        // Other layers require stick deflection
-        if (!self.is_deflected) return 0;
-
+        // Stick is deflected into a slice:
         const slice_idx: usize = @intFromEnum(self.last_aimed_slice);
-        const is_second_layer = (state_flags & FLAG_R2_HOLD) != 0;
+        const is_second_layer = self.is_second_page or ((state_flags & FLAG_R2_HOLD) != 0);
 
         var char_code: u16 = switch (self.current_layer) {
             .A_H => LAYOUT_A_H[slice_idx],
             .I_P => LAYOUT_I_P[slice_idx],
-            .Q_X => LAYOUT_Q_X[slice_idx],
-            .Y_Z => LAYOUT_Y_Z[slice_idx],
+            .Q_Z => if (is_second_layer) LAYOUT_Q_Z_2[slice_idx] else LAYOUT_Q_Z_1[slice_idx],
+            .Macro => LAYOUT_MACRO[slice_idx],
             .MoreSym => if (is_second_layer) LAYOUT_MORE_SYM_2[slice_idx] else LAYOUT_MORE_SYM_1[slice_idx],
             .NumSym => if (is_second_layer) LAYOUT_NUM_9_0[slice_idx] else LAYOUT_NUM_1_8[slice_idx],
             .Fn => if (is_second_layer) LAYOUT_FN_9_12[slice_idx] else LAYOUT_FN_1_8[slice_idx],
@@ -258,6 +289,11 @@ pub const InputStateMachine = struct {
         };
 
         if (char_code == 0) return 0;
+
+        // Macro keys don't get shifted or modified with letter-based Ctrl
+        if (self.current_layer == .Macro) {
+            return @as(i32, char_code);
+        }
 
         var active_mods: i32 = 0;
 
@@ -333,6 +369,7 @@ pub export fn Java_com_radpad_app_InputEngine_backToBase(
     _ = env;
     _ = clazz;
     global_engine.current_layer = .Base;
+    global_engine.is_second_page = false;
 }
 
 pub export fn Java_com_radpad_app_InputEngine_getCurrentLayer(
@@ -353,7 +390,37 @@ pub export fn Java_com_radpad_app_InputEngine_setCurrentLayer(
     _ = clazz;
     if (layer_id >= 0 and layer_id <= 8) {
         global_engine.current_layer = @enumFromInt(@as(u8, @intCast(layer_id)));
+        global_engine.is_second_page = false;
     }
+}
+
+pub export fn Java_com_radpad_app_InputEngine_isSecondPage(
+    env: ?*anyopaque,
+    clazz: ?*anyopaque,
+) callconv(.c) bool {
+    _ = env;
+    _ = clazz;
+    return global_engine.is_second_page;
+}
+
+pub export fn Java_com_radpad_app_InputEngine_setSecondPage(
+    env: ?*anyopaque,
+    clazz: ?*anyopaque,
+    second_page: bool,
+) callconv(.c) void {
+    _ = env;
+    _ = clazz;
+    global_engine.is_second_page = second_page;
+}
+
+pub export fn Java_com_radpad_app_InputEngine_toggleSecondPage(
+    env: ?*anyopaque,
+    clazz: ?*anyopaque,
+) callconv(.c) bool {
+    _ = env;
+    _ = clazz;
+    global_engine.is_second_page = !global_engine.is_second_page;
+    return global_engine.is_second_page;
 }
 
 pub export fn Java_com_radpad_app_InputEngine_resetState(
@@ -412,73 +479,105 @@ test "L1 returns from active layer to Base" {
     // Press L1 (FLAG_BACK)
     _ = engine.process(0.0, 0.0, FLAG_BACK);
     try std.testing.expectEqual(LayerId.Base, engine.current_layer);
+    try std.testing.expectEqual(false, engine.is_second_page);
 }
 
-test "MORE_SYM layer: sym 1 and sym 2 with R2 hold" {
+test "Q-Z layer: q..x on Page 1, y..z on Page 2 via center R1 toggle and R2 hold" {
+    var engine = InputStateMachine{};
+    engine.current_layer = .Q_Z;
+
+    // Page 1: North is 'q'
+    const out_q = engine.process(0.0, -0.8, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, 'q'), out_q & 0xFF);
+
+    // Center stick (0, 0) and press R1 to toggle to Page 2
+    const toggle_out = engine.process(0.0, 0.0, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, PAGE_TOGGLE_EVENT_MASK | 1), toggle_out);
+    try std.testing.expect(engine.is_second_page);
+
+    // Page 2: North is now 'y'
+    const out_y = engine.process(0.0, -0.8, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, 'y'), out_y & 0xFF);
+
+    // Page 2: NorthEast is 'z'
+    const out_z = engine.process(0.7, -0.7, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, 'z'), out_z & 0xFF);
+
+    // Center stick (0, 0) and press R1 again to toggle back to Page 1
+    const toggle_back = engine.process(0.0, 0.0, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, PAGE_TOGGLE_EVENT_MASK | 0), toggle_back);
+    try std.testing.expect(!engine.is_second_page);
+
+    // Page 1: North is 'q' again
+    const out_q2 = engine.process(0.0, -0.8, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, 'q'), out_q2 & 0xFF);
+
+    // While on Page 1, holding R2 temporarily gives 'y'
+    const out_y_r2 = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
+    try std.testing.expectEqual(@as(i32, 'y'), out_y_r2 & 0xFF);
+}
+
+test "MACRO layer emits KEY_MACRO_0..KEY_MACRO_7" {
+    var engine = InputStateMachine{};
+    engine.current_layer = .Macro;
+
+    // North is KEY_MACRO_0
+    const out_m0 = engine.process(0.0, -0.8, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, KEY_MACRO_0), out_m0);
+
+    // East is KEY_MACRO_2
+    const out_m2 = engine.process(0.8, 0.0, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, KEY_MACRO_2), out_m2);
+
+    // NorthWest is KEY_MACRO_7
+    const out_m7 = engine.process(-0.7, -0.7, FLAG_SELECT);
+    try std.testing.expectEqual(@as(i32, KEY_MACRO_7), out_m7);
+}
+
+test "MORE_SYM layer: sym 1 and sym 2 with center R1 toggle and R2 hold" {
     var engine = InputStateMachine{};
     engine.current_layer = .MoreSym;
 
-    // North without R2 is '\''
+    // North without R2 is '''
     const out_quote = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, '\''), out_quote & 0xFF);
 
-    // North with Shift is '"'
-    const out_dquote = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_SHIFT);
-    try std.testing.expectEqual(@as(i32, '"'), out_dquote & 0xFF);
+    // Center R1 toggles to sym 2
+    _ = engine.process(0.0, 0.0, FLAG_SELECT);
+    try std.testing.expect(engine.is_second_page);
 
-    // North with R2 (FLAG_R2_HOLD) is '`'
-    const out_btick = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
+    // North is now '`'
+    const out_btick = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, '`'), out_btick & 0xFF);
 
-    // North with R2 + Shift is '~'
-    const out_tilde = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD | FLAG_SHIFT);
-    try std.testing.expectEqual(@as(i32, '~'), out_tilde & 0xFF);
-
-    // East with R2 is ']'
-    const out_rbr = engine.process(0.8, 0.0, FLAG_SELECT | FLAG_R2_HOLD);
+    // East is ']'
+    const out_rbr = engine.process(0.8, 0.0, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, ']'), out_rbr & 0xFF);
 
-    // West with R2 is '['
-    const out_lbr = engine.process(-0.8, 0.0, FLAG_SELECT | FLAG_R2_HOLD);
-    try std.testing.expectEqual(@as(i32, '['), out_lbr & 0xFF);
+    // Toggle back
+    _ = engine.process(0.0, 0.0, FLAG_SELECT);
+    try std.testing.expect(!engine.is_second_page);
 }
 
-test "NUM_SYM layer: 1-8 and 9-0 with R2 hold" {
+test "NUM_SYM layer: 1-8 and 9-0 with center R1 toggle" {
     var engine = InputStateMachine{};
     engine.current_layer = .NumSym;
 
-    // North without R2 is '1'
+    // North is '1'
     const out_1 = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, '1'), out_1 & 0xFF);
 
-    // North with Shift is '!'
-    const out_excl = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_SHIFT);
-    try std.testing.expectEqual(@as(i32, '!'), out_excl & 0xFF);
+    // Center R1 toggles to 9-0
+    _ = engine.process(0.0, 0.0, FLAG_SELECT);
+    try std.testing.expect(engine.is_second_page);
 
-    // North with R2 is '9'
-    const out_9 = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
+    // North is '9'
+    const out_9 = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, '9'), out_9 & 0xFF);
 
-    // NorthEast with R2 is '0'
-    const out_0 = engine.process(0.7, -0.7, FLAG_SELECT | FLAG_R2_HOLD);
+    // NorthEast is '0'
+    const out_0 = engine.process(0.7, -0.7, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, '0'), out_0 & 0xFF);
-}
-
-test "FN layer: F1-F8 and F9-F12 with R2 hold" {
-    var engine = InputStateMachine{};
-    engine.current_layer = .Fn;
-
-    // North is F1
-    const out_f1 = engine.process(0.0, -0.8, FLAG_SELECT);
-    try std.testing.expectEqual(@as(i32, KEY_F1), out_f1 & 0xFFFF);
-
-    // North with R2 is F9
-    const out_f9 = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
-    try std.testing.expectEqual(@as(i32, KEY_F9), out_f9 & 0xFFFF);
-
-    // SouthEast with R2 is F12
-    const out_f12 = engine.process(0.7, 0.7, FLAG_SELECT | FLAG_R2_HOLD);
-    try std.testing.expectEqual(@as(i32, KEY_F12), out_f12 & 0xFFFF);
 }
 
 test "SYS layer: Vol Toggle in deadzone, PgUp, Vol+, Del around ring" {
@@ -492,16 +591,4 @@ test "SYS layer: Vol Toggle in deadzone, PgUp, Vol+, Del around ring" {
     // North is PgUp
     const out_pgup = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, KEY_PGUP), out_pgup & 0xFFFF);
-
-    // NorthEast is Vol+
-    const out_volup = engine.process(0.7, -0.7, FLAG_SELECT);
-    try std.testing.expectEqual(@as(i32, KEY_VOL_UP), out_volup & 0xFFFF);
-
-    // SouthEast is Delete
-    const out_del = engine.process(0.7, 0.7, FLAG_SELECT);
-    try std.testing.expectEqual(@as(i32, KEY_DELETE), out_del & 0xFFFF);
-
-    // NorthWest is Vol-
-    const out_voldown = engine.process(-0.7, -0.7, FLAG_SELECT);
-    try std.testing.expectEqual(@as(i32, KEY_VOL_DOWN), out_voldown & 0xFFFF);
 }

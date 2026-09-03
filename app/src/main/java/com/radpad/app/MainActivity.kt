@@ -139,6 +139,34 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
+        // Macro Layer Spinners (Slots 0 to 7)
+        MacroManager.init(this)
+        val macroSpinnerIds = intArrayOf(
+            R.id.spn_macro_0, R.id.spn_macro_1, R.id.spn_macro_2, R.id.spn_macro_3,
+            R.id.spn_macro_4, R.id.spn_macro_5, R.id.spn_macro_6, R.id.spn_macro_7
+        )
+        val macroPresetNames = MacroManager.PRESETS.map { it.displayName }
+        val macroAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, macroPresetNames).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+
+        for (slot in 0..7) {
+            val spn = findViewById<Spinner>(macroSpinnerIds[slot]) ?: continue
+            spn.adapter = macroAdapter
+            val currentMacro = MacroManager.getMacro(slot)
+            val currentPresetIdx = MacroManager.PRESETS.indexOfFirst { it.id == currentMacro.id }.coerceAtLeast(0)
+            spn.setSelection(currentPresetIdx)
+
+            spn.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val chosenPreset = MacroManager.PRESETS[position]
+                    MacroManager.setMacro(slot, chosenPreset.id)
+                    refreshRadialHUD()
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+        }
+
         inputManager = getSystemService(Context.INPUT_SERVICE) as? InputManager
         inputManager?.registerInputDeviceListener(this, null)
         FloatingHUDManager.register(this)
@@ -340,6 +368,10 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 val result = engine.onSelect()
                 val emitted = result?.let {
                     when {
+                        it.charCode in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
+                            val slot = it.charCode - InputEngine.KEY_MACRO_0
+                            "MACRO: " + MacroManager.getMacro(slot).displayName
+                        }
                         it.charCode == InputEngine.KEY_VOL_MUTE -> "VOL MUTE"
                         it.charCode == InputEngine.KEY_VOL_UP -> "VOL+"
                         it.charCode == InputEngine.KEY_VOL_DOWN -> "VOL-"
@@ -356,7 +388,8 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 engine.backToBaseLayer()
                 tvLiveInput.text = "L1 Back: Returned to BASE"
                 handled = true
-
+            }
+            KeyEvent.KEYCODE_BUTTON_L2 -> {
                 isL2ButtonDown = true
                 isShift = true
             }

@@ -42,6 +42,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         FloatingHUDManager.activeEngine = engine
         ThemeManager.init(this)
         ThemeManager.register(this)
+        MacroManager.init(this)
     }
 
     override fun onCreateInputView(): View {
@@ -58,7 +59,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         radialHUD?.isSymmetric = isSymmetric
 
 
-        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.text = "R1: Select / Type | L1: Base | R2: 2nd Tier"
+        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.text = "R1: Select / Type | Center R1: 2nd Page | L1: Base"
         view.findViewById<TextView>(R.id.tv_ime_cheatsheet2)?.text = "A: Space | X: Backspace | Y: Enter | B: Tab"
 
         applyThemeToIME(ThemeManager.currentTheme)
@@ -392,6 +393,8 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             InputEngine.Layer.MORE_SYM -> if (isSecond) "SYM 2" else "SYM 1"
             InputEngine.Layer.NUM_SYM -> if (isSecond) "NUM (9-0)" else "NUM (1-8)"
             InputEngine.Layer.FN -> if (isSecond) "FN (9-12)" else "FN (1-8)"
+            InputEngine.Layer.Q_Z -> if (isSecond) "Q-Z (Y-Z)" else "Q-Z (Q-X)"
+            InputEngine.Layer.MACRO -> "MACROS"
             else -> layer.displayName
         }
         hudZone?.text = zoneLabel
@@ -415,6 +418,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
         if (lastEvent != null) {
             val displayChar = when {
+                lastEvent.charCode in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
+                    val slot = lastEvent.charCode - InputEngine.KEY_MACRO_0
+                    "MACRO: " + MacroManager.getMacro(slot).displayName
+                }
                 lastEvent.charCode == InputEngine.KEY_SUPER -> "WIN (Super)"
                 lastEvent.charCode == InputEngine.KEY_DELETE -> "DEL"
                 lastEvent.charCode == InputEngine.KEY_VOL_UP -> "VOL+"

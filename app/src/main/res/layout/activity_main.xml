@@ -191,6 +191,210 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
+        <!-- Macro Layer Settings Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#1B1D2E"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚡ Custom Macro Layer (8 Radial Slots)"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:layout_marginBottom="10dp"
+                android:text="Assigned to SW sector on Base layer. Configure shortcuts and key combos for all 8 directions:"
+                android:textColor="#888B9E"
+                android:textSize="11sp" />
+
+            <!-- Slot 0: North -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 1: North (0°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 1: NorthEast -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 2: NorthEast (45°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 2: East -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 3: East (90°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 3: SouthEast -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 4: SouthEast (135°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 4: South -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 5: South (180°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 5: SouthWest -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 6: SouthWest (225°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 6: West -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 7: West (270°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <!-- Slot 7: NorthWest -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="3dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Slot 8: NorthWest (315°)"
+                    android:textColor="#BAC2DE"
+                    android:textSize="12sp" />
+                <Spinner
+                    android:id="@+id/spn_macro_7"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+        </LinearLayout>
+
+
         <!-- Step 1 Button -->
         <Button
             android:id="@+id/btn_enable_ime"
@@ -304,7 +508,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• R1: Select / Commit (Right Bumper: Enter layer on Base, or type character inside layer)\n• L1: Return to Base (Left Bumper: Instantly exits any sublayer back to Base)\n• R2: Hold for 2nd Tier (Right Trigger: Switches to sym 2, 9-0, fn9-fn12 while held)\n• L2: Shift (Left Trigger: HOLD for uppercase letters / secondary symbols)"
+                android:text="• R1: Select / Commit (Right Bumper: Enter layer on Base, or type character inside layer)\n• Center R1: Toggle 2nd Page (Center stick inside Q-Z, SYM, NUM, FN and press R1 to toggle 2nd page!)\n• L1: Return to Base (Left Bumper: Instantly exits any sublayer back to Base)\n• R2: Hold for 2nd Tier (Right Trigger: Also switches to 2nd page while held)\n• L2: Shift (Left Trigger: HOLD for uppercase letters / secondary symbols)"
                 android:textColor="#C0CAF5"
                 android:textSize="12sp" />
 

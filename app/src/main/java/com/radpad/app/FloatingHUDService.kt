@@ -81,7 +81,8 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         radialHUD = floatingView?.findViewById(R.id.floating_radial_hud)
         val header = floatingView?.findViewById<View>(R.id.floating_header)
 
-        tvCheatsheet?.text = "R1: Select | L1: Base | R2: 2nd"
+        MacroManager.init(this)
+        tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Base"
 
         closeBtn?.setOnClickListener {
             stopSelf()
@@ -213,10 +214,12 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                 InputEngine.Layer.MORE_SYM -> if (secondLayer) "SYM 2" else "SYM 1"
                 InputEngine.Layer.NUM_SYM -> if (secondLayer) "9-0" else "1-8"
                 InputEngine.Layer.FN -> if (secondLayer) "FN 9-12" else "FN 1-8"
+                InputEngine.Layer.Q_Z -> if (secondLayer) "Y-Z" else "Q-X"
+                InputEngine.Layer.MACRO -> "MACRO"
                 else -> layer.displayName
             }
             val modeColor = when (layer) {
-                InputEngine.Layer.FN, InputEngine.Layer.SYS -> theme.modeFnColor
+                InputEngine.Layer.FN, InputEngine.Layer.SYS, InputEngine.Layer.MACRO -> theme.modeFnColor
                 InputEngine.Layer.NUM_SYM, InputEngine.Layer.MORE_SYM -> theme.mode123Color
                 else -> theme.modeAbcColor
             }
