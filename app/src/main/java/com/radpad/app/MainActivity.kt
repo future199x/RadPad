@@ -1,6 +1,11 @@
 package com.radpad.app
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.text.Editable
+import android.text.TextWatcher
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.content.Context
 import android.content.Intent
 import android.hardware.input.InputManager
@@ -139,33 +144,9 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Macro Layer Spinners (Slots 0 to 7)
+        // Macro Layer Spinners & Edit Buttons (Slots 0 to 7)
         MacroManager.init(this)
-        val macroSpinnerIds = intArrayOf(
-            R.id.spn_macro_0, R.id.spn_macro_1, R.id.spn_macro_2, R.id.spn_macro_3,
-            R.id.spn_macro_4, R.id.spn_macro_5, R.id.spn_macro_6, R.id.spn_macro_7
-        )
-        val macroPresetNames = MacroManager.PRESETS.map { it.displayName }
-        val macroAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, macroPresetNames).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-
-        for (slot in 0..7) {
-            val spn = findViewById<Spinner>(macroSpinnerIds[slot]) ?: continue
-            spn.adapter = macroAdapter
-            val currentMacro = MacroManager.getMacro(slot)
-            val currentPresetIdx = MacroManager.PRESETS.indexOfFirst { it.id == currentMacro.id }.coerceAtLeast(0)
-            spn.setSelection(currentPresetIdx)
-
-            spn.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val chosenPreset = MacroManager.PRESETS[position]
-                    MacroManager.setMacro(slot, chosenPreset.id)
-                    refreshRadialHUD()
-                }
-                override fun onNothingSelected(parent: AdapterView<*>?) {}
-            }
-        }
+        setupMacroControls()
 
         inputManager = getSystemService(Context.INPUT_SERVICE) as? InputManager
         inputManager?.registerInputDeviceListener(this, null)
@@ -205,6 +186,177 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         findViewById<View>(R.id.banner_controller_status)?.setBackgroundColor(theme.cardBackground)
         findViewById<TextView>(R.id.tv_controller_detail)?.setTextColor(theme.inactiveText)
         refreshRadialHUD()
+    }
+
+
+    private fun setupMacroControls() {
+        val macroSpinnerIds = intArrayOf(
+            R.id.spn_macro_0, R.id.spn_macro_1, R.id.spn_macro_2, R.id.spn_macro_3,
+            R.id.spn_macro_4, R.id.spn_macro_5, R.id.spn_macro_6, R.id.spn_macro_7
+        )
+        val macroCustomButtonIds = intArrayOf(
+            R.id.btn_macro_custom_0, R.id.btn_macro_custom_1, R.id.btn_macro_custom_2, R.id.btn_macro_custom_3,
+            R.id.btn_macro_custom_4, R.id.btn_macro_custom_5, R.id.btn_macro_custom_6, R.id.btn_macro_custom_7
+        )
+
+        for (slot in 0..7) {
+            val spn = findViewById<Spinner>(macroSpinnerIds[slot]) ?: continue
+            val btn = findViewById<Button>(macroCustomButtonIds[slot])
+
+            updateSpinnerForSlot(slot, spn)
+
+            btn?.setOnClickListener {
+                showCustomMacroDialog(slot)
+            }
+        }
+    }
+
+    private fun updateSpinnerForSlot(slot: Int, spn: Spinner) {
+        val currentMacro = MacroManager.getMacro(slot)
+        val options = MacroManager.PRESETS.map { it.displayName }.toMutableList()
+        val customOption = if (currentMacro.id.startsWith("custom")) {
+            "✏️ ${currentMacro.displayName} [${currentMacro.shortHudLabel}]"
+        } else {
+            "✏️ Custom / Key Combo..."
+        }
+        options.add(customOption)
+
+        val spinnerAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, options).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spn.adapter = spinnerAdapter
+
+        val selectedPos = if (currentMacro.id.startsWith("custom")) {
+            options.size - 1
+        } else {
+            val idx = MacroManager.PRESETS.indexOfFirst { it.id == currentMacro.id }
+            if (idx >= 0) idx else 0
+        }
+        spn.setSelection(selectedPos)
+
+        spn.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position == options.size - 1) {
+                    if (!currentMacro.id.startsWith("custom")) {
+                        showCustomMacroDialog(slot)
+                    }
+                } else {
+                    val preset = MacroManager.PRESETS[position]
+                    MacroManager.setMacro(slot, preset.id)
+                    refreshRadialHUD()
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun refreshMacroSpinners() {
+        val macroSpinnerIds = intArrayOf(
+            R.id.spn_macro_0, R.id.spn_macro_1, R.id.spn_macro_2, R.id.spn_macro_3,
+            R.id.spn_macro_4, R.id.spn_macro_5, R.id.spn_macro_6, R.id.spn_macro_7
+        )
+        for (slot in 0..7) {
+            val spn = findViewById<Spinner>(macroSpinnerIds[slot]) ?: continue
+            updateSpinnerForSlot(slot, spn)
+        }
+    }
+
+    private fun showCustomMacroDialog(slot: Int) {
+        val current = MacroManager.getMacro(slot)
+        val directions = arrayOf(
+            "North (0°)", "NorthEast (45°)", "East (90°)", "SouthEast (135°)",
+            "South (180°)", "SouthWest (225°)", "West (270°)", "NorthWest (315°)"
+        )
+        val slotDir = directions.getOrElse(slot) { "Slot ${slot + 1}" }
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 30, 50, 10)
+        }
+
+        val tvInfo = TextView(this).apply {
+            text = "Enter key combo (e.g. ctrl+shift+z, win+shift+s, alt+tab) or text (e.g. text:hello):"
+            textSize = 12f
+            setTextColor(0xFFBAC2DE.toInt())
+            setPadding(0, 0, 0, 16)
+        }
+        layout.addView(tvInfo)
+
+        val etCombo = EditText(this).apply {
+            hint = "Key combo (e.g. ctrl+shift+z)"
+            setText(if (current.type == MacroManager.MacroType.TEXT) "text:${current.textPayload}" else current.displayName)
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF6C7086.toInt())
+        }
+        layout.addView(etCombo)
+
+        val etLabel = EditText(this).apply {
+            hint = "Short HUD Label (e.g. REDO, max 6 chars)"
+            setText(current.shortHudLabel)
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF6C7086.toInt())
+        }
+        layout.addView(etLabel)
+
+        val tvStatus = TextView(this).apply {
+            text = "Validating..."
+            textSize = 12f
+            setPadding(0, 16, 0, 0)
+        }
+        layout.addView(tvStatus)
+
+        var validatedItem: MacroManager.MacroItem? = null
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Slot ${slot + 1}: $slotDir")
+            .setView(layout)
+            .setPositiveButton("Save", null)
+            .setNegativeButton("Cancel") { _, _ ->
+                refreshMacroSpinners()
+            }
+            .create()
+
+        fun validate() {
+            val comboText = etCombo.text.toString()
+            val labelText = etLabel.text.toString()
+            val result = MacroManager.parse(comboText, labelText)
+            when (result) {
+                is MacroManager.ValidationResult.Valid -> {
+                    validatedItem = result.item
+                    tvStatus.text = "✓ ${result.description}"
+                    tvStatus.setTextColor(0xFFA6E3A1.toInt())
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = true
+                }
+                is MacroManager.ValidationResult.Invalid -> {
+                    validatedItem = null
+                    tvStatus.text = "✗ ${result.errorMessage}"
+                    tvStatus.setTextColor(0xFFF38BA8.toInt())
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = false
+                }
+            }
+        }
+
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { validate() }
+            override fun afterTextChanged(s: Editable?) {}
+        }
+        etCombo.addTextChangedListener(watcher)
+        etLabel.addTextChangedListener(watcher)
+
+        dialog.setOnShowListener {
+            validate()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                val item = validatedItem
+                if (item != null) {
+                    MacroManager.setCustomMacro(slot, item)
+                    refreshMacroSpinners()
+                    refreshRadialHUD()
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
     }
 
     override fun onResume() {
@@ -384,9 +536,9 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_L1 -> {
-                // Left Bumper: Back to Base
-                engine.backToBaseLayer()
-                tvLiveInput.text = "L1 Back: Returned to BASE"
+                // Left Bumper: Go back one layer level (Page 2 -> Page 1 -> Base)
+                engine.goBackLayer()
+                tvLiveInput.text = "L1 Back: Layer [${engine.currentLayer.displayName}]"
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_L2 -> {

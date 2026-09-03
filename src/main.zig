@@ -213,6 +213,21 @@ pub const InputStateMachine = struct {
         }
     }
 
+    /// Go back one level in the layer hierarchy:
+    /// If in Page 2 -> returns to Page 1.
+    /// If in Page 1 of any sublayer -> returns to Base.
+    /// If in Base -> stays in Base.
+    pub fn goBack(self: *InputStateMachine) i32 {
+        if (self.is_second_page) {
+            self.is_second_page = false;
+            return PAGE_TOGGLE_EVENT_MASK | 0;
+        } else if (self.current_layer != .Base) {
+            self.current_layer = .Base;
+            return LAYER_EVENT_MASK | @as(i32, @intFromEnum(LayerId.Base));
+        }
+        return 0;
+    }
+
     /// Evaluates raw analog stick coordinates and button bitmasks.
     /// Motion alone NEVER emits a character (flick selection removed).
     pub fn process(self: *InputStateMachine, x: f32, y: f32, state_flags: i32) i32 {
@@ -223,11 +238,9 @@ pub const InputStateMachine = struct {
             self.last_aimed_slice = self.calculateSlice(x, y);
         }
 
-        // Left Bumper (L1 / FLAG_BACK) returns to Base Layer
+        // Left Bumper (L1 / FLAG_BACK) goes back one layer level
         if ((state_flags & FLAG_BACK) != 0) {
-            self.current_layer = .Base;
-            self.is_second_page = false;
-            return 0;
+            return self.goBack();
         }
 
         // Right Bumper (R1 / FLAG_SELECT) performs selection
@@ -360,6 +373,15 @@ pub export fn Java_com_radpad_app_InputEngine_select(
     _ = env;
     _ = clazz;
     return global_engine.handleSelection(state_flags);
+}
+
+pub export fn Java_com_radpad_app_InputEngine_goBack(
+    env: ?*anyopaque,
+    clazz: ?*anyopaque,
+) callconv(.c) i32 {
+    _ = env;
+    _ = clazz;
+    return global_engine.goBack();
 }
 
 pub export fn Java_com_radpad_app_InputEngine_backToBase(
@@ -591,4 +613,34 @@ test "SYS layer: Vol Toggle in deadzone, PgUp, Vol+, Del around ring" {
     // North is PgUp
     const out_pgup = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, KEY_PGUP), out_pgup & 0xFFFF);
+}
+
+test "Hierarchical L1 goBack: Page 2 to Page 1, Page 1 to Base" {
+    var engine = InputStateMachine{};
+    // Base -> Q-Z
+    _ = engine.process(0.0, 0.8, 0); // Aim South
+    _ = engine.handleSelection(0);
+    try std.testing.expectEqual(LayerId.Q_Z, engine.current_layer);
+    try std.testing.expect(!engine.is_second_page);
+
+    // Center stick, press R1 to toggle to Page 2
+    _ = engine.process(0.0, 0.0, 0);
+    _ = engine.handleSelection(0);
+    try std.testing.expect(engine.is_second_page);
+
+    // Press L1 (goBack): should return to Page 1
+    const res1 = engine.goBack();
+    try std.testing.expectEqual(PAGE_TOGGLE_EVENT_MASK | 0, res1);
+    try std.testing.expectEqual(LayerId.Q_Z, engine.current_layer);
+    try std.testing.expect(!engine.is_second_page);
+
+    // Press L1 again: should return to Base
+    const res2 = engine.goBack();
+    try std.testing.expectEqual(LAYER_EVENT_MASK | @as(i32, @intFromEnum(LayerId.Base)), res2);
+    try std.testing.expectEqual(LayerId.Base, engine.current_layer);
+
+    // Press L1 on Base: should do nothing (return 0)
+    const res3 = engine.goBack();
+    try std.testing.expectEqual(@as(i32, 0), res3);
+    try std.testing.expectEqual(LayerId.Base, engine.current_layer);
 }

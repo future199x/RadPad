@@ -59,7 +59,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         radialHUD?.isSymmetric = isSymmetric
 
 
-        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.text = "R1: Select / Type | Center R1: 2nd Page | L1: Base"
+        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.text = "R1: Select / Type | Center R1: 2nd Page | L1: Back"
         view.findViewById<TextView>(R.id.tv_ime_cheatsheet2)?.text = "A: Space | X: Backspace | Y: Enter | B: Tab"
 
         applyThemeToIME(ThemeManager.currentTheme)
@@ -149,9 +149,9 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             return true
         }
 
-        // 2. Left Bumper (L1): Return to Base Layer
+        // 2. Left Bumper (L1): Go back one layer level (Page 2 -> Page 1 -> Base)
         if (keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
-            engine.backToBaseLayer()
+            engine.goBackLayer()
             updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
             return true
         }

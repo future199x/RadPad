@@ -82,7 +82,7 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         val header = floatingView?.findViewById<View>(R.id.floating_header)
 
         MacroManager.init(this)
-        tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Base"
+        tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
 
         closeBtn?.setOnClickListener {
             stopSelf()

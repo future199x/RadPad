@@ -167,6 +167,7 @@ class InputEngine {
     // Bare-metal JNI methods
     external fun processInput(x: Float, y: Float, buttonMask: Int): Int
     external fun select(stateFlags: Int): Int
+    external fun goBack(): Int
     external fun backToBase()
     external fun getCurrentLayer(): Int
     external fun setCurrentLayer(layerId: Int)
@@ -297,6 +298,25 @@ class InputEngine {
                 else -> 7
             }
         }
+    }
+
+    /**
+     * Goes back one level in the layer hierarchy (Left Bumper L1):
+     * Page 2 -> Page 1 -> Base.
+     */
+    fun goBackLayer(): ProcessedEvent? {
+        if (isNativeLoaded) {
+            try {
+                val raw = goBack()
+                return decode(raw)
+            } catch (_: UnsatisfiedLinkError) {}
+        }
+        if (isSecondLayerActive) {
+            isSecondLayerActive = false
+        } else if (currentLayer != Layer.BASE) {
+            currentLayer = Layer.BASE
+        }
+        return null
     }
 
     fun backToBaseLayer() {
@@ -623,11 +643,11 @@ class InputEngine {
             return true
         }
 
-        // L1: Return to Base Layer
+        // L1: Go back one layer level
         if (keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
             isL1ButtonDown = isDown
             if (isDown) {
-                backToBaseLayer()
+                goBackLayer()
             }
             return true
         }

@@ -237,6 +237,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 1: NorthEast -->
@@ -259,6 +274,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 2: East -->
@@ -281,6 +311,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 3: SouthEast -->
@@ -303,6 +348,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 4: South -->
@@ -325,6 +385,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 5: SouthWest -->
@@ -347,6 +422,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 6: West -->
@@ -369,6 +459,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Slot 7: NorthWest -->
@@ -391,6 +496,21 @@
                     android:layout_height="wrap_content"
                     android:backgroundTint="#7AA2F7"
                     android:popupBackground="#1E1E2E" />
+
+                <Button
+                    android:id="@+id/btn_macro_custom_7"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
+                    android:backgroundTint="#2E3440"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="Edit"
+                    android:textAllCaps="false"
+                    android:textColor="#88C0D0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 

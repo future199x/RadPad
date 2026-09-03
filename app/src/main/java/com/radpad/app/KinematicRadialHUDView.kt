@@ -444,28 +444,28 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
             InputEngine.Layer.Q_Z -> {
                 val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ Q - X ◀" else "▶ Y - Z ◀") else (if (isSecondLayer) "Y - Z (2/2)" else "Q - X (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
                 canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             InputEngine.Layer.MORE_SYM -> {
                 val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ SYM 1 ◀" else "▶ SYM 2 ◀") else (if (isSecondLayer) "SYM 2 (2/2)" else "SYM 1 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
                 canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             InputEngine.Layer.NUM_SYM -> {
                 val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ 1 - 8 ◀" else "▶ 9 - 0 ◀") else (if (isSecondLayer) "9 - 0 (2/2)" else "1 - 8 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
                 canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }
 
             InputEngine.Layer.FN -> {
                 val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ FN 1-8 ◀" else "▶ FN 9-12 ◀") else (if (isSecondLayer) "FN 9-12 (2/2)" else "FN 1-8 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else "L1: BASE"
+                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
                 canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
                 canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
             }

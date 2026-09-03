@@ -105,6 +105,66 @@ class InputEngineTest {
     }
 
     @Test
+    fun testMacroParserValidCombos() {
+        // Redo via Ctrl+Shift+Z
+        val resRedo = MacroManager.parse("ctrl+shift+z")
+        assertTrue(resRedo is MacroManager.ValidationResult.Valid)
+        val redoItem = (resRedo as MacroManager.ValidationResult.Valid).item
+        assertEquals(KeyEvent.KEYCODE_Z, redoItem.keyCode)
+        assertTrue((redoItem.metaModifiers and KeyEvent.META_CTRL_ON) != 0)
+        assertTrue((redoItem.metaModifiers and KeyEvent.META_SHIFT_ON) != 0)
+        assertEquals("REDO", redoItem.shortHudLabel)
+
+        // Alt+F4
+        val resAltF4 = MacroManager.parse("alt+f4")
+        assertTrue(resAltF4 is MacroManager.ValidationResult.Valid)
+        val altF4Item = (resAltF4 as MacroManager.ValidationResult.Valid).item
+        assertEquals(KeyEvent.KEYCODE_F4, altF4Item.keyCode)
+        assertTrue((altF4Item.metaModifiers and KeyEvent.META_ALT_ON) != 0)
+        assertEquals("CLOSE", altF4Item.shortHudLabel)
+
+        // Win+D with custom label
+        val resWinD = MacroManager.parse("win+d", "MYDESK")
+        assertTrue(resWinD is MacroManager.ValidationResult.Valid)
+        val winDItem = (resWinD as MacroManager.ValidationResult.Valid).item
+        assertEquals(KeyEvent.KEYCODE_D, winDItem.keyCode)
+        assertTrue((winDItem.metaModifiers and (KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)) != 0)
+        assertEquals("MYDESK", winDItem.shortHudLabel)
+
+        // Space separated combo: "ctrl shift a"
+        val resCtrlShiftA = MacroManager.parse("ctrl shift a")
+        assertTrue(resCtrlShiftA is MacroManager.ValidationResult.Valid)
+        val itemA = (resCtrlShiftA as MacroManager.ValidationResult.Valid).item
+        assertEquals(KeyEvent.KEYCODE_A, itemA.keyCode)
+
+        // Text macro: "text:hello world"
+        val resText = MacroManager.parse("text:hello world")
+        assertTrue(resText is MacroManager.ValidationResult.Valid)
+        val textItem = (resText as MacroManager.ValidationResult.Valid).item
+        assertEquals(MacroManager.MacroType.TEXT, textItem.type)
+        assertEquals("hello world", textItem.textPayload)
+    }
+
+    @Test
+    fun testMacroParserInvalidInputs() {
+        // Empty
+        val resEmpty = MacroManager.parse("")
+        assertTrue(resEmpty is MacroManager.ValidationResult.Invalid)
+
+        // Missing key
+        val resNoKey = MacroManager.parse("ctrl+shift")
+        assertTrue(resNoKey is MacroManager.ValidationResult.Invalid)
+
+        // Unknown key
+        val resUnknown = MacroManager.parse("ctrl+unknownkey")
+        assertTrue(resUnknown is MacroManager.ValidationResult.Invalid)
+
+        // Multiple keys
+        val resMultiple = MacroManager.parse("ctrl+a+b")
+        assertTrue(resMultiple is MacroManager.ValidationResult.Invalid)
+    }
+
+    @Test
     fun testBaseLayerSelectionAndTyping() {
         val engine = InputEngine()
         assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
@@ -117,8 +177,8 @@ class InputEngineTest {
         engine.setLayer(InputEngine.Layer.A_H)
         assertEquals(InputEngine.Layer.A_H, engine.currentLayer)
 
-        // Press L1 to return to BASE
-        engine.onKeyEvent(KeyEvent.KEYCODE_BUTTON_L1, isDown = true)
+        // Press L1 (goBackLayer): returns to BASE
+        engine.goBackLayer()
         assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
     }
 
@@ -158,5 +218,31 @@ class InputEngineTest {
         // onSelect again toggles back to Page 1
         engine.onSelect()
         assertFalse(engine.isSecondLayerActive)
+    }
+
+    @Test
+    fun testHierarchicalL1GoBackLayer() {
+        val engine = InputEngine()
+        engine.setLayer(InputEngine.Layer.Q_Z)
+        assertFalse(engine.isSecondLayerActive)
+
+        // Toggle to Page 2
+        engine.onMotion(0.0f, 0.0f)
+        engine.onSelect()
+        assertTrue(engine.isSecondLayerActive)
+        assertEquals(InputEngine.Layer.Q_Z, engine.currentLayer)
+
+        // L1 GoBack: Should step back to Page 1, NOT Base!
+        engine.goBackLayer()
+        assertFalse(engine.isSecondLayerActive)
+        assertEquals(InputEngine.Layer.Q_Z, engine.currentLayer)
+
+        // L1 GoBack again: From Page 1, steps back to Base!
+        engine.goBackLayer()
+        assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
+
+        // L1 GoBack on Base: Remains on Base!
+        engine.goBackLayer()
+        assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
     }
 }
