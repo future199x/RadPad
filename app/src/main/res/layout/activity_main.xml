@@ -186,7 +186,45 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="Choose button action: Toggle Floating Overlay (Default), Paste from Clipboard, Super (Windows) Key, or Real Forward Delete (DEL)."
+                android:text="Select button: Toggle HUD (Default), Hide Keyboard, or Toggle HUD + Hide Keyboard."
+                android:textColor="#888B9E"
+                android:textSize="11sp" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="#2E3440" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Start / Options Button Action"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spn_start_action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Start button: Hide Keyboard (Default), Toggle HUD, or Toggle HUD + Hide Keyboard."
                 android:textColor="#888B9E"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -685,7 +723,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select: Toggle Floating Overlay (Default, or Paste / Super / Delete in Settings)\n• Options / Start: Hide keyboard"
+                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select &amp; Start: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)\n• Options / Start: Configurable in Settings"
                 android:textColor="#C0CAF5"
                 android:textSize="12sp" />
         </LinearLayout>

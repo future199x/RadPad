@@ -294,53 +294,42 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 return true
             }
 
-            // Share / Select: Toggle Floating Overlay (Default), or Paste / Super / Delete based on settings
+            // Share / Select Button
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-                val selectAction = prefs.getString("select_button_action", "floater")
-                when (selectAction) {
-                    "super" -> {
-                        val mask = engine.currentButtonMask
-                        var metaState = KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-                        if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-                        if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-                        if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
-                        currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_META_LEFT, 0, metaState))
-                        currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0, metaState))
-                        hudStatus?.text = "Emitted: 'WIN (Super)'"
-                    }
-                    "delete" -> {
-                        val ic = currentInputConnection
-                        if (ic?.deleteSurroundingText(0, 1) != true) {
-                            sendDownUpKeyEvents(KeyEvent.KEYCODE_FORWARD_DEL)
-                        }
-                        hudStatus?.text = "Emitted: 'DEL (Forward)'"
-                    }
-                    "paste" -> {
-                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        val clip = clipboard?.primaryClip?.getItemAt(0)?.text
-                        if (!clip.isNullOrEmpty()) {
-                            currentInputConnection?.commitText(clip, 1)
-                        }
-                        hudStatus?.text = "Emitted: 'PASTE'"
-                    }
-                    else -> {
-                        val isShown = FloatingHUDManager.toggleFloater(this)
-                        hudStatus?.text = if (isShown) "Overlay: Visible" else "Overlay: Hidden"
-                    }
-                }
+                val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
+                executeSystemButtonAction(action)
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
             }
 
-            // Options / Start: Close Keyboard
+            // Options / Start: Close Keyboard / Toggle HUD
             KeyEvent.KEYCODE_BUTTON_START -> {
-                requestHideSelf(0)
+                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
+                executeSystemButtonAction(action)
+                updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
             }
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun executeSystemButtonAction(actionKey: String) {
+        when (actionKey) {
+            "hide_keyboard" -> {
+                requestHideSelf(0)
+            }
+            "toggle_hud_hide_keyboard" -> {
+                FloatingHUDManager.toggleFloater(this)
+                requestHideSelf(0)
+            }
+            else -> { // "toggle_hud"
+                val isShown = FloatingHUDManager.toggleFloater(this)
+                hudStatus?.text = if (isShown) "Overlay: Visible" else "Overlay: Hidden"
+            }
+        }
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

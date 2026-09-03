@@ -101,22 +101,40 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         }
 
 
-        // Select Button Action Setting Spinner
-        val spnSelectAction = findViewById<Spinner>(R.id.spn_select_action)
-        val selectActions = arrayOf("Toggle Floating Overlay", "Paste from Clipboard", "Super (Windows) Key", "Real Forward Delete (DEL)")
-        val selectActionKeys = arrayOf("floater", "paste", "super", "delete")
-        val selectAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, selectActions).apply {
+        // Button Action Spinners (Select and Start)
+        val buttonActions = arrayOf("Toggle HUD", "Hide Keyboard", "Toggle HUD + Hide Keyboard")
+        val buttonActionKeys = arrayOf("toggle_hud", "hide_keyboard", "toggle_hud_hide_keyboard")
+
+        val actionAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, buttonActions).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
-        spnSelectAction.adapter = selectAdapter
-        val currentAction = prefs.getString("select_button_action", "floater")
-        val selectIdx = selectActionKeys.indexOf(currentAction).coerceAtLeast(0)
+
+        // Select / Share Button Spinner
+        val spnSelectAction = findViewById<Spinner>(R.id.spn_select_action)
+        spnSelectAction.adapter = actionAdapter
+        val currentSelectAction = prefs.getString("select_button_action", "toggle_hud")
+        val selectIdx = buttonActionKeys.indexOf(currentSelectAction).coerceAtLeast(0)
         spnSelectAction.setSelection(selectIdx)
 
         spnSelectAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                val chosenKey = selectActionKeys[position]
+                val chosenKey = buttonActionKeys[position]
                 prefs.edit().putString("select_button_action", chosenKey).apply()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        // Start / Options Button Spinner
+        val spnStartAction = findViewById<Spinner>(R.id.spn_start_action)
+        spnStartAction.adapter = actionAdapter
+        val currentStartAction = prefs.getString("start_button_action", "hide_keyboard")
+        val startIdx = buttonActionKeys.indexOf(currentStartAction).coerceAtLeast(0)
+        spnStartAction.setSelection(startIdx)
+
+        spnStartAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val chosenKey = buttonActionKeys[position]
+                prefs.edit().putString("start_button_action", chosenKey).apply()
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -371,6 +389,26 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         FloatingHUDManager.unregister(this)
     }
 
+    private fun executeSystemButtonAction(buttonName: String, actionKey: String) {
+        when (actionKey) {
+            "hide_keyboard" -> {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
+                tvLiveInput.text = "$buttonName Button -> Action: Hide Keyboard"
+            }
+            "toggle_hud_hide_keyboard" -> {
+                toggleFloatingHUD()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
+                tvLiveInput.text = "$buttonName Button -> Action: Toggle HUD + Hide Keyboard"
+            }
+            else -> { // "toggle_hud"
+                toggleFloatingHUD()
+                tvLiveInput.text = "$buttonName Button -> Action: Toggle HUD"
+            }
+        }
+    }
+
     private fun toggleFloatingHUD() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             val intent = Intent(
@@ -554,14 +592,14 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-                val action = prefs.getString("select_button_action", "floater")
-                when (action) {
-                    "super" -> isSuper = true
-                    "delete" -> {}
-                    "paste" -> {}
-                    else -> toggleFloatingHUD()
-                }
-                tvLiveInput.text = "Select Button -> Action: $action"
+                val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
+                executeSystemButtonAction("Select", action)
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_START -> {
+                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
+                executeSystemButtonAction("Start", action)
                 handled = true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> onDpadAction("← Left")
