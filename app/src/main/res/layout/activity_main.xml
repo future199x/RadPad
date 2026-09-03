@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#12121E"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎮 RadPad"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Zero-latency snappy radial keyboard powered by bare-metal Zig"
+            android:textColor="#A0A0B8"
+            android:textSize="13sp" />
+
+        <!-- Live Controller Status Banner -->
+        <LinearLayout
+            android:id="@+id/banner_controller_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#1E2030"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tv_controller_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔍 Checking for Game Controller..."
+                android:textColor="#F9E2AF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_controller_detail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Aim Right Stick. Press R1 to Select. L1 returns to Base. Hold R2 for 2nd tier."
+                android:textColor="#BAC2DE"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tv_live_input"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Stick X: 0.00 | Y: 0.00 | Triggers: None"
+                android:textColor="#A6E3A1"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Live Interactive Radial Dial Preview -->
+        <com.radpad.app.KinematicRadialHUDView
+            android:id="@+id/main_radial_hud_view"
+            android:layout_width="220dp"
+            android:layout_height="220dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginVertical="12dp" />
+
+        <!-- Settings: Equal Slices Symmetry Switch -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1B1D2E"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Equal 45° Slices (Symmetric)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Switch
+                    android:id="@+id/sw_symmetric_slices"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_symmetry_desc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="ON: All 8 directions have equal 45° sectors. OFF: Wide 60° cardinals (N, E, S, W) and 30° diagonals."
+                android:textColor="#888B9E"
+                android:textSize="11sp" />
+
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="#2E3440" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Color Scheme"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spn_color_scheme"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Select from: Tokyo Night, Gruvbox, Dracula, or Black &amp; White."
+                android:textColor="#888B9E"
+                android:textSize="11sp" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="#2E3440" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Select / Share Button Action"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spn_select_action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="#7AA2F7"
+                    android:popupBackground="#1E1E2E" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Choose button action: Paste from Clipboard, Super (Windows) Key, or Real Forward Delete (DEL)."
+                android:textColor="#888B9E"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Step 1 Button -->
+        <Button
+            android:id="@+id/btn_enable_ime"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#00439C"
+            android:text="Step 1: Enable in Settings"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Step 2 Button -->
+        <Button
+            android:id="@+id/btn_select_ime"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#2E3440"
+            android:text="Step 2: Choose as Active Keyboard"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Step 3 Button: Always-On Floating Overlay -->
+        <Button
+            android:id="@+id/btn_floating_hud"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#2E7D32"
+            android:text="📌 Launch Always-On Floating HUD"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Test Input Box -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Test Typing Area:"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/et_test_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="#1E1E2E"
+            android:hint="Tap here to test typing with RadPad..."
+            android:minHeight="64dp"
+            android:padding="12dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#70708C"
+            android:textSize="15sp" />
+
+        <!-- Complete RadPad Controller Button Map -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="🎮 Full Controller Button Mappings:"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#161826"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <!-- Face Buttons -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FACE BUTTONS"
+                android:textColor="#7AA2F7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• ▢ (Square): Backspace (Hold L2 / Shift for Real Forward Delete!)\n• ✕ (Cross): Space (Primary Action Button, supports Win/Ctrl/Alt+Space)\n• △ (Triangle): Enter / Newline (supports Win/Ctrl/Alt+Enter)\n• ○ (Circle): Tab (Indent / Field navigation, supports Win/Alt/Ctrl+Tab)"
+                android:textColor="#C0CAF5"
+                android:textSize="12sp" />
+
+            <!-- Bumpers & Triggers -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="BUMPERS &amp; TRIGGERS"
+                android:textColor="#7AA2F7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• R1: Select / Commit (Right Bumper: Enter layer on Base, or type character inside layer)\n• L1: Return to Base (Left Bumper: Instantly exits any sublayer back to Base)\n• R2: Hold for 2nd Tier (Right Trigger: Switches to sym 2, 9-0, fn9-fn12 while held)\n• L2: Shift (Left Trigger: HOLD for uppercase letters / secondary symbols)"
+                android:textColor="#C0CAF5"
+                android:textSize="12sp" />
+
+            <!-- Left Stick Modifier Joystick -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="LEFT STICK (MODIFIER JOYSTICK)"
+                android:textColor="#7AA2F7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• Tilt Right: SUPER / WIN (Hold for Win+D, Win+E, Win+R, Win+Tab, Win+Arrows)\n• Tilt Down: CTRL (Hold for Ctrl+C, Ctrl+V, Ctrl+Z, Ctrl+A...)\n• Tilt Left: ALT (Hold for Alt+key, Alt+Tab, Alt+F4...)\n• Tilt Up: SHIFT (or Left Trigger L2)\n• Diagonals: Down-Right = Win+Ctrl, Up-Right = Win+Shift, Down-Left = Ctrl+Alt\n• Flick Right &amp; Release: Tap standalone Super (Windows) Key to open Start/Launcher!\n• L3 Click: Caps Lock Toggle (Lights up [CAPS])"
+                android:textColor="#C0CAF5"
+                android:textSize="12sp" />
+
+            <!-- D-Pad -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="D-PAD &amp; CURSOR NAVIGATION"
+                android:textColor="#7AA2F7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• ← (Left): Move cursor left (Super+Left to Snap left)\n• → (Right): Move cursor right (Super+Right to Snap right)\n• ↑ (Up): Move cursor up\n• ↓ (Down): Move cursor down"
+                android:textColor="#C0CAF5"
+                android:textSize="12sp" />
+
+            <!-- Right Stick & System -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="RIGHT STICK &amp; SYSTEM BUTTONS"
+                android:textColor="#7AA2F7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select: Paste / Super (Win) / Delete (Choose in Settings above)\n• Options / Start: Hide keyboard"
+                android:textColor="#C0CAF5"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

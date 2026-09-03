@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    IME Metadata Configuration
+    Specifies system keyboard subtype and locale binding.
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:isDefault="false">
+    <subtype
+        android:label="@string/subtype_name"
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

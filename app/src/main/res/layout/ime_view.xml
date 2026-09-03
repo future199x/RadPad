@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    RadPad Keyboard HUD Overlay
+    Features interactive kinematic radial dial, layer indicator, and controller shortcuts.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ime_root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#12131F"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="12dp">
+
+    <!-- Top Status Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tv_hud_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/hud_status_ready"
+            android:textColor="#C0CAF5"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_hud_modifiers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:text="MODS: NONE"
+            android:textColor="#9ECE6A"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_hud_zone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ZONE 0"
+            android:textColor="#7AA2F7"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Kinematic Radial HUD Dial -->
+    <com.radpad.app.KinematicRadialHUDView
+        android:id="@+id/radial_hud_view"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginVertical="4dp" />
+
+    <!-- Bottom Button Visual Map -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:layout_marginTop="2dp">
+
+        <TextView
+            android:id="@+id/tv_ime_cheatsheet1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="▢ ⌫ (L2+▢: ⌦)  •  ✕ Space  •  △ Enter  •  ○ Tab  •  L2 Shift"
+            android:textColor="#BAC2DE"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_ime_cheatsheet2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="R1 Numbers  •  L1/R2 Layers  •  L-Stick ➔ Win  •  L3 Caps  •  R3 Esc"
+            android:textColor="#7AA2F7"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

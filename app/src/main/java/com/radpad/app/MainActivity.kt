@@ -1,0 +1,415 @@
+package com.radpad.app
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.hardware.input.InputManager
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.widget.AdapterView
+import android.widget.Button
+import android.widget.Spinner
+import android.widget.Switch
+import android.widget.TextView
+
+/**
+ * MainActivity: Diagnostic Controller Detector, Live Radial Dial Telemetry, and Setup.
+ */
+class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.ThemeListener {
+
+    private lateinit var tvStatus: TextView
+    private lateinit var tvDetail: TextView
+    private lateinit var tvLiveInput: TextView
+    private lateinit var btnFloatingHud: Button
+    private var radialHUD: KinematicRadialHUDView? = null
+    private var inputManager: InputManager? = null
+
+    private val engine = InputEngine()
+
+    private var currentX: Float = 0f
+    private var currentY: Float = 0f
+    private var currentLayer: InputEngine.Layer = InputEngine.Layer.BASE
+    private var isSecondLayer: Boolean = false
+    private var isShift: Boolean = false
+    private var isCtrl: Boolean = false
+    private var isAlt: Boolean = false
+    private var isSuper: Boolean = false
+    private var isCaps: Boolean = false
+    private var isL2ButtonDown: Boolean = false
+    private var isR2ButtonDown: Boolean = false
+    private var l2TriggerActive: Boolean = false
+    private var r2TriggerActive: Boolean = false
+    private var leftStickShiftActive: Boolean = false
+    private var leftStickCtrlActive: Boolean = false
+    private var leftStickAltActive: Boolean = false
+    private var leftStickSuperActive: Boolean = false
+    private var lastHatX: Float = 0f
+    private var lastHatY: Float = 0f
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        tvStatus = findViewById(R.id.tv_controller_status)
+        tvDetail = findViewById(R.id.tv_controller_detail)
+        tvLiveInput = findViewById(R.id.tv_live_input)
+        radialHUD = findViewById(R.id.main_radial_hud_view)
+
+        val btnEnable = findViewById<Button>(R.id.btn_enable_ime)
+        val btnSelect = findViewById<Button>(R.id.btn_select_ime)
+        btnFloatingHud = findViewById(R.id.btn_floating_hud)
+
+        btnEnable.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+        }
+
+        btnSelect.setOnClickListener {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showInputMethodPicker()
+        }
+
+        btnFloatingHud.setOnClickListener {
+            toggleFloatingHUD()
+        }
+
+        // Slices Symmetry Setting Switch
+        val swSymmetric = findViewById<Switch>(R.id.sw_symmetric_slices)
+        val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+        val isSymmetric = prefs.getBoolean("is_symmetric_slices", true)
+        swSymmetric.isChecked = isSymmetric
+        radialHUD?.isSymmetric = isSymmetric
+        engine.setSymmetricSlices(isSymmetric)
+
+        swSymmetric.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("is_symmetric_slices", isChecked).apply()
+            radialHUD?.isSymmetric = isChecked
+            engine.setSymmetricSlices(isChecked)
+        }
+
+
+        // Select Button Action Setting Spinner
+        val spnSelectAction = findViewById<Spinner>(R.id.spn_select_action)
+        val selectActions = arrayOf("Paste from Clipboard", "Super (Windows) Key", "Real Forward Delete (DEL)")
+        val selectActionKeys = arrayOf("paste", "super", "delete")
+        val selectAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, selectActions).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spnSelectAction.adapter = selectAdapter
+        val currentAction = prefs.getString("select_button_action", "paste")
+        val selectIdx = selectActionKeys.indexOf(currentAction).coerceAtLeast(0)
+        spnSelectAction.setSelection(selectIdx)
+
+        spnSelectAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val chosenKey = selectActionKeys[position]
+                prefs.edit().putString("select_button_action", chosenKey).apply()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        ThemeManager.init(this)
+        ThemeManager.register(this)
+
+        val spnTheme = findViewById<Spinner>(R.id.spn_color_scheme)
+        val themes = ThemeManager.ColorScheme.values()
+        val themeNames = themes.map { it.displayName }
+        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, themeNames).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spnTheme.adapter = adapter
+        val currentIdx = themes.indexOf(ThemeManager.currentTheme).coerceAtLeast(0)
+        spnTheme.setSelection(currentIdx)
+
+        spnTheme.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedTheme = themes[position]
+                if (selectedTheme != ThemeManager.currentTheme) {
+                    ThemeManager.setTheme(this@MainActivity, selectedTheme)
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        inputManager = getSystemService(Context.INPUT_SERVICE) as? InputManager
+        inputManager?.registerInputDeviceListener(this, null)
+
+        detectConnectedControllers()
+        refreshRadialHUD()
+    }
+
+    override fun onThemeChanged(theme: ThemeManager.ColorScheme) {
+        radialHUD?.applyColorScheme(theme)
+        findViewById<View>(R.id.banner_controller_status)?.setBackgroundColor(theme.cardBackground)
+        findViewById<TextView>(R.id.tv_controller_detail)?.setTextColor(theme.inactiveText)
+        refreshRadialHUD()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateFloatingButtonState()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        inputManager?.unregisterInputDeviceListener(this)
+        ThemeManager.unregister(this)
+    }
+
+    private fun toggleFloatingHUD() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+            return
+        }
+
+        val serviceIntent = Intent(this, FloatingHUDService::class.java)
+        if (FloatingHUDService.isRunning) {
+            stopService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        updateFloatingButtonState()
+    }
+
+    private fun updateFloatingButtonState() {
+        if (FloatingHUDService.isRunning) {
+            btnFloatingHud.text = "✕ Close Always-On Floating HUD"
+            btnFloatingHud.setBackgroundColor(0xFFC53B53.toInt())
+        } else {
+            btnFloatingHud.text = "📌 Launch Always-On Floating HUD"
+            btnFloatingHud.setBackgroundColor(0xFF2E7D32.toInt())
+        }
+    }
+
+    private fun detectConnectedControllers() {
+        val allDevices = mutableListOf<String>()
+        val gamepadNames = mutableListOf<String>()
+
+        for (id in InputDevice.getDeviceIds()) {
+            val dev = InputDevice.getDevice(id) ?: continue
+            val sources = dev.sources
+            allDevices.add("${dev.name} (id=$id)")
+
+            val hasJoystick = (sources and InputDevice.SOURCE_JOYSTICK) != 0
+            val hasGamepad = (sources and InputDevice.SOURCE_GAMEPAD) != 0
+            val hasDpad = (sources and InputDevice.SOURCE_DPAD) != 0
+
+            if (hasJoystick || hasGamepad || hasDpad ||
+                dev.name.contains("pad", ignoreCase = true) ||
+                dev.name.contains("controller", ignoreCase = true) ||
+                dev.name.contains("sony", ignoreCase = true)) {
+                gamepadNames.add(dev.name)
+            }
+        }
+
+        if (gamepadNames.isNotEmpty()) {
+            tvStatus.text = "🎮 Gamepad Ready: ${gamepadNames.joinToString(", ")}"
+            tvStatus.setTextColor(0xFF9ECE6A.toInt())
+            tvDetail.text = "Aim Right Stick. Press R1 to Select. L1 returns to Base. Hold R2 for 2nd tier."
+        } else {
+            tvStatus.text = "⚠️ No Gamepad Detected in Android"
+            tvStatus.setTextColor(0xFFF7768E.toInt())
+            tvDetail.text = "Android sees: " + allDevices.joinToString(", ")
+        }
+    }
+
+    private fun refreshRadialHUD() {
+        currentLayer = engine.currentLayer
+        isSecondLayer = engine.isSecondLayerActive
+
+        radialHUD?.updateState(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
+        FloatingHUDManager.updateInput(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
+    }
+
+    private fun onDpadAction(dir: String) {
+        tvStatus.text = "🎮 D-Pad Navigation: $dir"
+        tvStatus.setTextColor(0xFF7AA2F7.toInt())
+        tvLiveInput.text = "D-Pad: $dir"
+    }
+
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        val lx = event.getAxisValue(MotionEvent.AXIS_X)
+        val ly = event.getAxisValue(MotionEvent.AXIS_Y)
+
+        val ENGAGE = 0.35f
+        val RELEASE = 0.20f
+
+        leftStickShiftActive = if (leftStickShiftActive) ly <= -RELEASE else ly <= -ENGAGE
+        leftStickCtrlActive = if (leftStickCtrlActive) ly >= RELEASE else ly >= ENGAGE
+        leftStickAltActive = if (leftStickAltActive) lx <= -RELEASE else lx <= -ENGAGE
+        leftStickSuperActive = if (leftStickSuperActive) lx >= RELEASE else lx >= ENGAGE
+
+        isCtrl = leftStickCtrlActive
+        isAlt = leftStickAltActive
+        isSuper = leftStickSuperActive
+
+        val rawZ = event.getAxisValue(MotionEvent.AXIS_Z)
+        val rawRZ = event.getAxisValue(MotionEvent.AXIS_RZ)
+        val rawRX = event.getAxisValue(MotionEvent.AXIS_RX)
+        val rawRY = event.getAxisValue(MotionEvent.AXIS_RY)
+        currentX = if (rawZ != 0f || rawRZ != 0f) rawZ else rawRX
+        currentY = if (rawZ != 0f || rawRZ != 0f) rawRZ else rawRY
+
+        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+
+        if (hatX != lastHatX) {
+            if (hatX < -0.5f) onDpadAction("← Left")
+            else if (hatX > 0.5f) onDpadAction("→ Right")
+            lastHatX = hatX
+        }
+
+        if (hatY != lastHatY) {
+            if (hatY < -0.5f) onDpadAction("↑ Up")
+            else if (hatY > 0.5f) onDpadAction("↓ Down")
+            lastHatY = hatY
+        }
+
+        val l2Val = event.getAxisValue(MotionEvent.AXIS_LTRIGGER).let { if (it != 0f) it else event.getAxisValue(MotionEvent.AXIS_BRAKE) }
+        val r2Val = event.getAxisValue(MotionEvent.AXIS_RTRIGGER).let { if (it != 0f) it else event.getAxisValue(MotionEvent.AXIS_GAS) }
+
+        l2TriggerActive = if (l2TriggerActive) l2Val >= 0.25f else l2Val >= 0.5f
+        r2TriggerActive = if (r2TriggerActive) r2Val >= 0.25f else r2Val >= 0.5f
+
+        isShift = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+        isSecondLayer = isR2ButtonDown || r2TriggerActive
+
+        engine.onMotionEvent(event)
+
+        val activeMods = mutableListOf<String>()
+        if (isCaps) activeMods.add("CAPS")
+        if (isShift) activeMods.add("SHIFT")
+        if (isCtrl) activeMods.add("CTRL")
+        if (isAlt) activeMods.add("ALT")
+        if (isSuper) activeMods.add("WIN")
+        if (isSecondLayer) activeMods.add("2ND")
+        val modSummary = if (activeMods.isEmpty()) "NONE" else activeMods.joinToString("+")
+
+        val layerName = if (isSecondLayer) "${engine.currentLayer.displayName} (2nd)" else engine.currentLayer.displayName
+        tvStatus.text = "🎮 Controller Signal: Layer [$layerName]"
+        tvStatus.setTextColor(0xFF9ECE6A.toInt())
+        tvLiveInput.text = String.format("R-Stick: X:%+.2f Y:%+.2f | Mods: %s", currentX, currentY, modSummary)
+
+        refreshRadialHUD()
+        return true
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        var handled = true
+        when (keyCode) {
+            KeyEvent.KEYCODE_BUTTON_R1 -> {
+                // Right Bumper: Select
+                val result = engine.onSelect()
+                val emitted = result?.let {
+                    when {
+                        it.charCode == InputEngine.KEY_VOL_MUTE -> "VOL MUTE"
+                        it.charCode == InputEngine.KEY_VOL_UP -> "VOL+"
+                        it.charCode == InputEngine.KEY_VOL_DOWN -> "VOL-"
+                        it.charCode == InputEngine.KEY_DELETE -> "DEL"
+                        it.charCode in InputEngine.KEY_F1..InputEngine.KEY_F12 -> "F${it.charCode - InputEngine.KEY_F1 + 1}"
+                        else -> it.char.toString()
+                    }
+                } ?: "Selected Layer: ${engine.currentLayer.displayName}"
+                tvLiveInput.text = "R1 Select: $emitted"
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_L1 -> {
+                // Left Bumper: Back to Base
+                engine.backToBaseLayer()
+                tvLiveInput.text = "L1 Back: Returned to BASE"
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_B -> handled = true
+            KeyEvent.KEYCODE_BUTTON_L2 -> {
+                isL2ButtonDown = true
+                isShift = true
+            }
+            KeyEvent.KEYCODE_BUTTON_R2 -> {
+                isR2ButtonDown = true
+                isSecondLayer = true
+                engine.onKeyEvent(keyCode, isDown = true)
+            }
+            KeyEvent.KEYCODE_BUTTON_THUMBL -> isCaps = !isCaps
+            KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
+            KeyEvent.KEYCODE_BUTTON_SELECT -> {
+                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                if (prefs.getString("select_button_action", "paste") == "super") {
+                    isSuper = true
+                }
+                handled = true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> onDpadAction("← Left")
+            KeyEvent.KEYCODE_DPAD_RIGHT -> onDpadAction("→ Right")
+            KeyEvent.KEYCODE_DPAD_UP -> onDpadAction("↑ Up")
+            KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction("↓ Down")
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_BUTTON_X,
+            KeyEvent.KEYCODE_BUTTON_Y -> {
+                handled = true
+            }
+            else -> handled = false
+        }
+
+        val btnName = when (keyCode) {
+            KeyEvent.KEYCODE_BUTTON_R1 -> "R1 [SELECT]"
+            KeyEvent.KEYCODE_BUTTON_L1 -> "L1 [BASE LAYER]"
+            KeyEvent.KEYCODE_BUTTON_X -> if (isShift) "Square [DEL (Forward)]" else "Square [BACKSPACE]"
+            else -> KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")
+        }
+        tvStatus.text = "🎮 Controller Signal Detected! (${event.device?.name ?: "Gamepad"})"
+        tvStatus.setTextColor(0xFF9ECE6A.toInt())
+
+        refreshRadialHUD()
+        return if (handled) true else super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        var handled = true
+        when (keyCode) {
+            KeyEvent.KEYCODE_BUTTON_L2 -> {
+                isL2ButtonDown = false
+                isShift = l2TriggerActive || leftStickShiftActive
+            }
+            KeyEvent.KEYCODE_BUTTON_R2 -> {
+                isR2ButtonDown = false
+                isSecondLayer = r2TriggerActive
+                engine.onKeyEvent(keyCode, isDown = false)
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> isCtrl = false
+            KeyEvent.KEYCODE_DPAD_LEFT -> isAlt = false
+            KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = false
+            KeyEvent.KEYCODE_BUTTON_SELECT -> {
+                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                if (prefs.getString("select_button_action", "paste") == "super") {
+                    isSuper = false
+                }
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_R1,
+            KeyEvent.KEYCODE_BUTTON_L1,
+            KeyEvent.KEYCODE_BUTTON_B,
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_BUTTON_X,
+            KeyEvent.KEYCODE_BUTTON_Y -> {
+                handled = true
+            }
+            else -> handled = false
+        }
+        refreshRadialHUD()
+        return if (handled) true else super.onKeyUp(keyCode, event)
+    }
+
+    override fun onInputDeviceAdded(deviceId: Int) { detectConnectedControllers() }
+    override fun onInputDeviceRemoved(deviceId: Int) { detectConnectedControllers() }
+    override fun onInputDeviceChanged(deviceId: Int) { detectConnectedControllers() }
+}

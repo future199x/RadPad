@@ -1,0 +1,52 @@
+# Built application files
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+app/build/
+
+# Gradle files
+.gradle/
+
+# Local configuration file (contains local SDK paths)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# NDK / C++ / Native intermediate build files
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Zig compiler cache and native build output
+.zig-cache/
+zig-out/
+
+# Kotlin daemon
+.kotlin/

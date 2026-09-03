@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Always-On Floating HUD Widget
+    Draggable, translucent, and persistently visible over all apps.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/floating_container"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_floating_card"
+    android:elevation="12dp"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- Drag Handle / Header Bar -->
+    <LinearLayout
+        android:id="@+id/floating_header"
+        android:layout_width="170dp"
+        android:layout_height="24dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp">
+
+        <TextView
+            android:id="@+id/tv_floating_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⠿ RADPAD"
+            android:textColor="#7AA2F7"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <!-- Mode Badge Toggle (ABC / 123) -->
+        <TextView
+            android:id="@+id/btn_floating_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#2E3440"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:layout_marginEnd="6dp"
+            android:text="ABC"
+            android:textColor="#A6E3A1"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <!-- Close Floating Widget Button -->
+        <TextView
+            android:id="@+id/btn_close_floating"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:gravity="center"
+            android:text="✕"
+            android:textColor="#F7768E"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Modifier Badges Bar (CAPS, SHIFT, CTRL, ALT, WIN) -->
+    <LinearLayout
+        android:id="@+id/floating_mod_bar"
+        android:layout_width="170dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:layout_marginTop="3dp"
+        android:layout_marginBottom="1dp">
+
+        <TextView
+            android:id="@+id/hud_badge_caps"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_marginHorizontal="1dp"
+            android:background="#2E3440"
+            android:paddingVertical="2dp"
+            android:text="CAPS"
+            android:textColor="#565F89"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/hud_badge_shift"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_marginHorizontal="1dp"
+            android:background="#2E3440"
+            android:paddingVertical="2dp"
+            android:text="SHIFT"
+            android:textColor="#565F89"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/hud_badge_ctrl"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_marginHorizontal="1dp"
+            android:background="#2E3440"
+            android:paddingVertical="2dp"
+            android:text="CTRL"
+            android:textColor="#565F89"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/hud_badge_alt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_marginHorizontal="1dp"
+            android:background="#2E3440"
+            android:paddingVertical="2dp"
+            android:text="ALT"
+            android:textColor="#565F89"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/hud_badge_super"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:layout_marginHorizontal="1dp"
+            android:background="#2E3440"
+            android:paddingVertical="2dp"
+            android:text="WIN"
+            android:textColor="#565F89"
+            android:textSize="8sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Interactive Kinematic Radial Dial -->
+    <com.radpad.app.KinematicRadialHUDView
+        android:id="@+id/floating_radial_hud"
+        android:layout_width="170dp"
+        android:layout_height="170dp"
+        android:layout_marginVertical="2dp" />
+
+    <!-- Compact Button Cheatsheet -->
+    <TextView
+        android:id="@+id/tv_floating_cheatsheet"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="▢ ⌫ • ✕ ␣ • △ ↵ • ○ ⇥"
+        android:textColor="#BAC2DE"
+        android:textSize="9sp"
+        android:textStyle="bold" />
+
+</LinearLayout>
