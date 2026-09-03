@@ -140,7 +140,9 @@ object VirtualMouseManager {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val sizePx = (48 * context.resources.displayMetrics.density).toInt()
+        val density = context.resources.displayMetrics.density
+        val tipOffset = 10f * density
+        val sizePx = (44 * density).toInt()
 
         layoutParams = WindowManager.LayoutParams(
             sizePx,
@@ -148,12 +150,20 @@ object VirtualMouseManager {
             layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = cursorX.toInt()
-            y = cursorY.toInt()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            x = (cursorX - tipOffset).toInt()
+            y = (cursorY - tipOffset).toInt()
         }
 
         try {
@@ -221,8 +231,9 @@ object VirtualMouseManager {
         val params = layoutParams ?: return
         val wm = windowManager ?: return
 
-        params.x = cursorX.toInt()
-        params.y = cursorY.toInt()
+        val tipOffset = 10f * view.context.resources.displayMetrics.density
+        params.x = (cursorX - tipOffset).toInt()
+        params.y = (cursorY - tipOffset).toInt()
         try {
             wm.updateViewLayout(view, params)
         } catch (e: Exception) {
@@ -268,6 +279,8 @@ object VirtualMouseManager {
      */
     private class CursorPointerView(context: Context) : View(context) {
         private val density = context.resources.displayMetrics.density
+        private val tipX = 10f * density
+        private val tipY = 10f * density
         private val arrowPath = Path()
         private val arrowFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
@@ -293,14 +306,14 @@ object VirtualMouseManager {
             setLayerType(LAYER_TYPE_SOFTWARE, null)
 
             val s = density
-            // Modern precision cursor geometry (tip at 0, 0)
-            arrowPath.moveTo(0f, 0f)
-            arrowPath.lineTo(0f, 22f * s)
-            arrowPath.lineTo(5.5f * s, 16.5f * s)
-            arrowPath.lineTo(10f * s, 25f * s)
-            arrowPath.lineTo(13.5f * s, 23.5f * s)
-            arrowPath.lineTo(9f * s, 15f * s)
-            arrowPath.lineTo(16f * s, 15f * s)
+            // Modern precision cursor geometry with tip anchored at (tipX, tipY)
+            arrowPath.moveTo(tipX, tipY)
+            arrowPath.lineTo(tipX, tipY + 22f * s)
+            arrowPath.lineTo(tipX + 5.5f * s, tipY + 16.5f * s)
+            arrowPath.lineTo(tipX + 10f * s, tipY + 25f * s)
+            arrowPath.lineTo(tipX + 13.5f * s, tipY + 23.5f * s)
+            arrowPath.lineTo(tipX + 9f * s, tipY + 15f * s)
+            arrowPath.lineTo(tipX + 16f * s, tipY + 15f * s)
             arrowPath.close()
         }
 
@@ -315,7 +328,7 @@ object VirtualMouseManager {
                 interpolator = DecelerateInterpolator()
                 addUpdateListener { va ->
                     val fraction = va.animatedFraction
-                    pulseRadius = fraction * 22f * density
+                    pulseRadius = fraction * 20f * density
                     pulseAlpha = ((1f - fraction) * 255).toInt()
                     invalidate()
                 }
@@ -326,11 +339,11 @@ object VirtualMouseManager {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            // Draw ripple pulse at cursor tip
+            // Draw ripple pulse centered precisely at arrow tip
             if (pulseAlpha > 0) {
                 pulsePaint.color = pulseColor
                 pulsePaint.alpha = pulseAlpha
-                canvas.drawCircle(0f, 0f, pulseRadius, pulsePaint)
+                canvas.drawCircle(tipX, tipY, pulseRadius, pulsePaint)
             }
 
             // Draw arrow pointer

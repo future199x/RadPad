@@ -84,6 +84,8 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         MacroManager.init(this)
         tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
 
+        VirtualMouseManager.register(mouseListener)
+
         closeBtn?.setOnClickListener {
             stopSelf()
         }
@@ -209,23 +211,34 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         val updateAction = Runnable {
             val theme = ThemeManager.currentTheme
 
-            val modeLabel = when (layer) {
-                InputEngine.Layer.BASE -> "BASE"
-                InputEngine.Layer.MORE_SYM -> if (secondLayer) "SYM 2" else "SYM 1"
-                InputEngine.Layer.NUM_SYM -> if (secondLayer) "9-0" else "1-8"
-                InputEngine.Layer.FN -> if (secondLayer) "FN 9-12" else "FN 1-8"
-                InputEngine.Layer.Q_Z -> if (secondLayer) "Y-Z" else "Q-X"
-                InputEngine.Layer.MACRO -> "MACRO"
-                else -> layer.displayName
+            val isMouse = VirtualMouseManager.isMouseLayerActive
+            if (isMouse) {
+                tvMode?.visibility = View.GONE
+                tvTitle?.text = "🐭 MOUSE MODE"
+                tvCheatsheet?.text = "← L-Click | → R-Click | ↑ Mid"
+            } else {
+                tvMode?.visibility = View.VISIBLE
+                tvTitle?.text = "⠿ RADPAD"
+                tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
+
+                val modeLabel = when (layer) {
+                    InputEngine.Layer.BASE -> "BASE"
+                    InputEngine.Layer.MORE_SYM -> if (secondLayer) "SYM 2" else "SYM 1"
+                    InputEngine.Layer.NUM_SYM -> if (secondLayer) "9-0" else "1-8"
+                    InputEngine.Layer.FN -> if (secondLayer) "FN 9-12" else "FN 1-8"
+                    InputEngine.Layer.Q_Z -> if (secondLayer) "Y-Z" else "Q-X"
+                    InputEngine.Layer.MACRO -> "MACRO"
+                    else -> layer.displayName
+                }
+                val modeColor = when (layer) {
+                    InputEngine.Layer.FN, InputEngine.Layer.SYS, InputEngine.Layer.MACRO -> theme.modeFnColor
+                    InputEngine.Layer.NUM_SYM, InputEngine.Layer.MORE_SYM -> theme.mode123Color
+                    else -> theme.modeAbcColor
+                }
+                tvMode?.text = modeLabel
+                tvMode?.setTextColor(modeColor)
+                tvMode?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
             }
-            val modeColor = when (layer) {
-                InputEngine.Layer.FN, InputEngine.Layer.SYS, InputEngine.Layer.MACRO -> theme.modeFnColor
-                InputEngine.Layer.NUM_SYM, InputEngine.Layer.MORE_SYM -> theme.mode123Color
-                else -> theme.modeAbcColor
-            }
-            tvMode?.text = modeLabel
-            tvMode?.setTextColor(modeColor)
-            tvMode?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
 
             // Caps badge
             if (caps) {
@@ -282,9 +295,29 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         }
     }
 
+    private val mouseListener = object : VirtualMouseManager.MouseStateListener {
+        override fun onMouseLayerChanged(active: Boolean) {
+            mainHandler.post {
+                if (active) {
+                    tvMode?.visibility = View.GONE
+                    tvTitle?.text = "🐭 MOUSE MODE"
+                    tvCheatsheet?.text = "← L-Click | → R-Click | ↑ Mid"
+                } else {
+                    tvMode?.visibility = View.VISIBLE
+                    tvTitle?.text = "⠿ RADPAD"
+                    tvCheatsheet?.text = "R1: Select | Center: 2nd | L1: Back"
+                }
+                radialHUD?.invalidate()
+            }
+        }
+        override fun onCursorMoved(x: Float, y: Float) {}
+        override fun onMouseClicked(button: VirtualMouseManager.MouseButton, x: Float, y: Float) {}
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        VirtualMouseManager.unregister(mouseListener)
         FloatingHUDManager.unregister(this)
         ThemeManager.unregister(this)
         if (floatingView != null) {

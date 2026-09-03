@@ -347,6 +347,32 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         val startAngles = if (isSymmetric) SYMMETRIC_START_ANGLES else ASYMMETRIC_START_ANGLES
         val sweepAngles = if (isSymmetric) SYMMETRIC_SWEEP_ANGLES else ASYMMETRIC_SWEEP_ANGLES
 
+        // Check if Mouse Layer is active: Do NOT show keyboard layer wedges, dividers, or characters!
+        if (VirtualMouseManager.isMouseLayerActive) {
+            canvas.drawCircle(centerX, centerY, radius, bgPaint)
+            canvas.drawCircle(centerX, centerY, radius, ringPaint)
+            canvas.drawCircle(centerX, centerY, radius * 0.65f, sliceDividerPaint)
+            canvas.drawCircle(centerX, centerY, deadzoneRadius, deadzonePaint)
+            canvas.drawCircle(centerX, centerY, deadzoneRadius, ringPaint)
+
+            // Crosshair guidelines
+            canvas.drawLine(centerX - radius * 0.45f, centerY, centerX + radius * 0.45f, centerY, sliceDividerPaint)
+            canvas.drawLine(centerX, centerY - radius * 0.45f, centerX, centerY + radius * 0.45f, sliceDividerPaint)
+
+            // Center Mouse Mode text
+            centerInfoPaint.textSize = radius * 0.14f
+            centerSubPaint.textSize = radius * 0.085f
+            canvas.drawText("🐭 MOUSE", centerX, centerY - (radius * 0.05f), activeTextPaint.apply { textSize = radius * 0.14f })
+            canvas.drawText("← L | → R | ↑ MID", centerX, centerY + (radius * 0.12f), centerSubPaint)
+
+            // Analog stick position dot (reticle)
+            val stickPixelX = centerX + (stickX * radius * 0.85f)
+            val stickPixelY = centerY + (stickY * radius * 0.85f)
+            canvas.drawCircle(stickPixelX, stickPixelY, 14f, reticleRingPaint)
+            canvas.drawCircle(stickPixelX, stickPixelY, 7f, reticlePaint)
+            return
+        }
+
         // 1. Draw outer circle background
         canvas.drawCircle(centerX, centerY, radius, bgPaint)
 
@@ -417,10 +443,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         centerInfoPaint.textSize = radius * 0.13f
         centerSubPaint.textSize = radius * 0.08f
 
-        if (VirtualMouseManager.isMouseLayerActive) {
-            canvas.drawText("🐭 MOUSE", centerX, centerY - (radius * 0.04f), activeTextPaint.apply { textSize = radius * 0.12f })
-            canvas.drawText("D-PAD: CLICKS", centerX, centerY + (radius * 0.12f), centerSubPaint)
-        } else when (currentLayer) {
+        when (currentLayer) {
             InputEngine.Layer.BASE -> {
                 val hoverPreview = when (targetedSlice) {
                     0 -> "A - H"
