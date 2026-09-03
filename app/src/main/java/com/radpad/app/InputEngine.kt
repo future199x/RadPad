@@ -1,18 +1,43 @@
 package com.radpad.app
 
-import android.content.Context
-import android.os.SystemClock
-import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.inputmethod.InputConnection
 import kotlin.math.atan2
 
 /**
- * InputEngine: Bare-metal bridge to the zero-latency Zig radial input engine.
+ * Bare-metal bridge to the zero-latency Zig radial input engine and standalone Kotlin state machine.
+ *
+ * ## Architecture & Design
+ * 1. **Radial Geometry Model**:
+ *    - Angles are calculated relative to North (0 radians = -Y, 12 o'clock).
+ *    - 8 cardinal and diagonal sectors (0..7): North (0), NorthEast (1), East (2), SouthEast (3),
+ *      South (4), SouthWest (5), West (6), NorthWest (7).
+ *    - Supports **Symmetric** (8 equal 45° sectors) and **Asymmetric** (wide 60° cardinals, narrow 30° diagonals) modes.
+ *
+ * 2. **Deadzone Hysteresis Model**:
+ *    - Prevents boundary jitter and accidental inputs using dual concentric engagement thresholds:
+ *      - Engagement radius: [DEADZONE_ENGAGE] (0.42 radial deflection) to enter a sector.
+ *      - Release radius: [DEADZONE_RELEASE] (0.25 radial deflection) to drop back into center deadzone.
+ *    - Same hysteresis principle applies to analog trigger pressure and left-stick modifier tilts.
+ *
+ * 3. **Modifier Bitmask Model**:
+ *    - Active modifiers (Shift, Ctrl, Alt, Super/Win, Caps Lock, R2 Hold) accumulate into [currentButtonMask].
+ *    - The combined bitmask is piped into the Zig engine or the Kotlin fallback decoder.
+ *
+ * 4. **Bare-Metal Zig Bridge with Kotlin Fallback**:
+ *    - Loads `libzigengine.so` at runtime.
+ *    - If unavailable or running on unsupported platforms/unit tests, all state management and decoding
+ *      gracefully fallback to pure-Kotlin implementations with zero latency degradation.
  */
 class InputEngine {
 
+    /**
+     * Radial input layers mapping to different character and utility sets.
+     *
+     * @property id Unique numeric identifier matching native Zig engine constants.
+     * @property displayName Short human-readable tag displayed on HUD overlays.
+     */
     enum class Layer(val id: Int, val displayName: String) {
         BASE(0, "BASE"),
         A_H(1, "A-H"),
@@ -25,11 +50,17 @@ class InputEngine {
         SYS(8, "SYS");
 
         companion object {
-            fun fromId(id: Int): Layer = values().firstOrNull { it.id == id } ?: BASE
+            /**
+             * Resolves a [Layer] by its numeric ID, defaulting to [BASE].
+             */
+            fun fromId(id: Int): Layer = entries.firstOrNull { it.id == id } ?: BASE
         }
     }
 
     companion object {
+        /**
+         * Indicates whether the high-performance Zig shared library (`libzigengine.so`) was successfully loaded.
+         */
         var isNativeLoaded: Boolean = false
             private set
 
@@ -42,65 +73,140 @@ class InputEngine {
             }
         }
 
-        const val FLAG_R2_HOLD: Int = 1 shl 1   // Right Trigger (R2) -> Mouse Layer Hold
-        const val FLAG_MOUSE_LAYER: Int = FLAG_R2_HOLD
-        const val FLAG_SHIFT: Int = 1 shl 2     // Shift (Left Trigger L2): Hold to uppercase
-        const val FLAG_CTRL: Int = 1 shl 3      // Ctrl (Left Stick Down / Tilt)
-        const val FLAG_ALT: Int = 1 shl 4       // Alt (Left Stick Left / Tilt)
-        const val FLAG_CAPS_LOCK: Int = 1 shl 5 // Caps Lock (toggled via L3 click)
-        const val FLAG_SUPER: Int = 1 shl 7     // Super / Windows Key (Left Stick Right / Tilt)
-        const val FLAG_SELECT: Int = 1 shl 8    // Right Bumper (R1): Select Layer / Character
-        const val FLAG_BACK: Int = 1 shl 9      // Left Bumper (L1): Return to Base Layer
+        // --- Grouped Constant Objects ---
 
-        // Special Key Codes (Matching main.zig: 0xF001 .. 0xF027)
-        const val KEY_F1: Int = 0xF001
-        const val KEY_F2: Int = 0xF002
-        const val KEY_F3: Int = 0xF003
-        const val KEY_F4: Int = 0xF004
-        const val KEY_F5: Int = 0xF005
-        const val KEY_F6: Int = 0xF006
-        const val KEY_F7: Int = 0xF007
-        const val KEY_F8: Int = 0xF008
-        const val KEY_F9: Int = 0xF009
-        const val KEY_F10: Int = 0xF00A
-        const val KEY_F11: Int = 0xF00B
-        const val KEY_F12: Int = 0xF00C
-        const val KEY_HOME: Int = 0xF00D
-        const val KEY_END: Int = 0xF00E
-        const val KEY_PGUP: Int = 0xF00F
-        const val KEY_PGDN: Int = 0xF010
-        const val KEY_SUPER: Int = 0xF011
-        const val KEY_DELETE: Int = 0xF012
-        const val KEY_INSERT: Int = 0xF013
-        const val KEY_VOL_UP: Int = 0xF014
-        const val KEY_VOL_DOWN: Int = 0xF015
-        const val KEY_VOL_MUTE: Int = 0xF016
+        /** Controller button and trigger state flags passed to JNI. */
+        object Flags {
+            const val R2_HOLD: Int = 1 shl 1      // Right Trigger (R2) -> Mouse Layer Hold
+            const val SHIFT: Int = 1 shl 2        // Shift (Left Trigger L2): Hold to uppercase
+            const val CTRL: Int = 1 shl 3         // Ctrl (Left Stick Down / Tilt)
+            const val ALT: Int = 1 shl 4          // Alt (Left Stick Left / Tilt)
+            const val CAPS_LOCK: Int = 1 shl 5    // Caps Lock (toggled via L3 click)
+            const val SUPER: Int = 1 shl 7        // Super / Windows Key (Left Stick Right / Tilt)
+        }
 
-        // Macro keys (0xF020 .. 0xF027)
-        const val KEY_MACRO_0: Int = 0xF020
-        const val KEY_MACRO_1: Int = 0xF021
-        const val KEY_MACRO_2: Int = 0xF022
-        const val KEY_MACRO_3: Int = 0xF023
-        const val KEY_MACRO_4: Int = 0xF024
-        const val KEY_MACRO_5: Int = 0xF025
-        const val KEY_MACRO_6: Int = 0xF026
-        const val KEY_MACRO_7: Int = 0xF027
+        /** Special Key Codes matching `main.zig` (0xF001 .. 0xF027). */
+        object SpecialKeys {
+            const val KEY_F1: Int = 0xF001
+            const val KEY_F2: Int = 0xF002
+            const val KEY_F3: Int = 0xF003
+            const val KEY_F4: Int = 0xF004
+            const val KEY_F5: Int = 0xF005
+            const val KEY_F6: Int = 0xF006
+            const val KEY_F7: Int = 0xF007
+            const val KEY_F8: Int = 0xF008
+            const val KEY_F9: Int = 0xF009
+            const val KEY_F10: Int = 0xF00A
+            const val KEY_F11: Int = 0xF00B
+            const val KEY_F12: Int = 0xF00C
+            const val KEY_HOME: Int = 0xF00D
+            const val KEY_END: Int = 0xF00E
+            const val KEY_PGUP: Int = 0xF00F
+            const val KEY_PGDN: Int = 0xF010
+            const val KEY_SUPER: Int = 0xF011
+            const val KEY_DELETE: Int = 0xF012
+            const val KEY_INSERT: Int = 0xF013
+            const val KEY_VOL_UP: Int = 0xF014
+            const val KEY_VOL_DOWN: Int = 0xF015
+            const val KEY_VOL_MUTE: Int = 0xF016
 
-        const val LAYER_EVENT_MASK: Int = 0xE000
-        const val PAGE_TOGGLE_EVENT_MASK: Int = 0xD000
+            // Macro keys (0xF020 .. 0xF027)
+            const val KEY_MACRO_0: Int = 0xF020
+            const val KEY_MACRO_1: Int = 0xF021
+            const val KEY_MACRO_2: Int = 0xF022
+            const val KEY_MACRO_3: Int = 0xF023
+            const val KEY_MACRO_4: Int = 0xF024
+            const val KEY_MACRO_5: Int = 0xF025
+            const val KEY_MACRO_6: Int = 0xF026
+            const val KEY_MACRO_7: Int = 0xF027
+        }
 
-        // Output Bitmasks
-        const val CHAR_MASK: Int = 0xFFFF
-        const val MOD_SHIFT: Int = 1 shl 16
-        const val MOD_CTRL: Int = 1 shl 17
-        const val MOD_ALT: Int = 1 shl 18
-        const val MOD_SUPER: Int = 1 shl 20
+        /** Output bitmasks for decoding packed event values. */
+        object OutputMasks {
+            const val CHAR_MASK: Int = 0xFFFF
+            const val MOD_SHIFT: Int = 1 shl 16
+            const val MOD_CTRL: Int = 1 shl 17
+            const val MOD_ALT: Int = 1 shl 18
+            const val MOD_SUPER: Int = 1 shl 20
 
-        const val TRIGGER_ENGAGEMENT_THRESHOLD: Float = 0.5f
-        const val DEADZONE_ENGAGE: Float = 0.42f
-        const val DEADZONE_ENGAGE_SQ: Float = DEADZONE_ENGAGE * DEADZONE_ENGAGE
-        const val DEADZONE_RELEASE: Float = 0.25f
-        const val DEADZONE_RELEASE_SQ: Float = DEADZONE_RELEASE * DEADZONE_RELEASE
+            const val LAYER_EVENT_MASK: Int = 0xE000
+            const val PAGE_TOGGLE_EVENT_MASK: Int = 0xD000
+        }
+
+        /** Analog stick deadzone radii and squared distance limits. */
+        object Deadzones {
+            const val ENGAGE: Float = 0.42f
+            const val ENGAGE_SQ: Float = ENGAGE * ENGAGE
+            const val RELEASE: Float = 0.25f
+            const val RELEASE_SQ: Float = RELEASE * RELEASE
+        }
+
+        /** Left-stick modifier and analog trigger activation thresholds. */
+        object Thresholds {
+            const val LEFT_STICK_ENGAGE: Float = 0.35f
+            const val LEFT_STICK_RELEASE: Float = 0.20f
+            const val TRIGGER_ENGAGEMENT_THRESHOLD: Float = 0.5f
+            const val TRIGGER_RELEASE_THRESHOLD: Float = 0.25f
+        }
+
+        // --- Backward-Compatible Top-Level Companion Constants ---
+        const val FLAG_R2_HOLD: Int = Flags.R2_HOLD
+        const val FLAG_SHIFT: Int = Flags.SHIFT
+        const val FLAG_CTRL: Int = Flags.CTRL
+        const val FLAG_ALT: Int = Flags.ALT
+        const val FLAG_CAPS_LOCK: Int = Flags.CAPS_LOCK
+        const val FLAG_SUPER: Int = Flags.SUPER
+
+        const val KEY_F1: Int = SpecialKeys.KEY_F1
+        const val KEY_F2: Int = SpecialKeys.KEY_F2
+        const val KEY_F3: Int = SpecialKeys.KEY_F3
+        const val KEY_F4: Int = SpecialKeys.KEY_F4
+        const val KEY_F5: Int = SpecialKeys.KEY_F5
+        const val KEY_F6: Int = SpecialKeys.KEY_F6
+        const val KEY_F7: Int = SpecialKeys.KEY_F7
+        const val KEY_F8: Int = SpecialKeys.KEY_F8
+        const val KEY_F9: Int = SpecialKeys.KEY_F9
+        const val KEY_F10: Int = SpecialKeys.KEY_F10
+        const val KEY_F11: Int = SpecialKeys.KEY_F11
+        const val KEY_F12: Int = SpecialKeys.KEY_F12
+        const val KEY_HOME: Int = SpecialKeys.KEY_HOME
+        const val KEY_END: Int = SpecialKeys.KEY_END
+        const val KEY_PGUP: Int = SpecialKeys.KEY_PGUP
+        const val KEY_PGDN: Int = SpecialKeys.KEY_PGDN
+        const val KEY_SUPER: Int = SpecialKeys.KEY_SUPER
+        const val KEY_DELETE: Int = SpecialKeys.KEY_DELETE
+        const val KEY_INSERT: Int = SpecialKeys.KEY_INSERT
+        const val KEY_VOL_UP: Int = SpecialKeys.KEY_VOL_UP
+        const val KEY_VOL_DOWN: Int = SpecialKeys.KEY_VOL_DOWN
+        const val KEY_VOL_MUTE: Int = SpecialKeys.KEY_VOL_MUTE
+
+        const val KEY_MACRO_0: Int = SpecialKeys.KEY_MACRO_0
+        const val KEY_MACRO_1: Int = SpecialKeys.KEY_MACRO_1
+        const val KEY_MACRO_2: Int = SpecialKeys.KEY_MACRO_2
+        const val KEY_MACRO_3: Int = SpecialKeys.KEY_MACRO_3
+        const val KEY_MACRO_4: Int = SpecialKeys.KEY_MACRO_4
+        const val KEY_MACRO_5: Int = SpecialKeys.KEY_MACRO_5
+        const val KEY_MACRO_6: Int = SpecialKeys.KEY_MACRO_6
+        const val KEY_MACRO_7: Int = SpecialKeys.KEY_MACRO_7
+
+        const val LAYER_EVENT_MASK: Int = OutputMasks.LAYER_EVENT_MASK
+        const val PAGE_TOGGLE_EVENT_MASK: Int = OutputMasks.PAGE_TOGGLE_EVENT_MASK
+
+        const val CHAR_MASK: Int = OutputMasks.CHAR_MASK
+        const val MOD_SHIFT: Int = OutputMasks.MOD_SHIFT
+        const val MOD_CTRL: Int = OutputMasks.MOD_CTRL
+        const val MOD_ALT: Int = OutputMasks.MOD_ALT
+        const val MOD_SUPER: Int = OutputMasks.MOD_SUPER
+
+        const val TRIGGER_ENGAGEMENT_THRESHOLD: Float = Thresholds.TRIGGER_ENGAGEMENT_THRESHOLD
+        const val TRIGGER_RELEASE_THRESHOLD: Float = Thresholds.TRIGGER_RELEASE_THRESHOLD
+        const val LEFT_STICK_ENGAGE: Float = Thresholds.LEFT_STICK_ENGAGE
+        const val LEFT_STICK_RELEASE: Float = Thresholds.LEFT_STICK_RELEASE
+
+        const val DEADZONE_ENGAGE: Float = Deadzones.ENGAGE
+        const val DEADZONE_ENGAGE_SQ: Float = Deadzones.ENGAGE_SQ
+        const val DEADZONE_RELEASE: Float = Deadzones.RELEASE
+        const val DEADZONE_RELEASE_SQ: Float = Deadzones.RELEASE_SQ
 
         val LAYOUT_A_H = arrayOf('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
         val LAYOUT_MORE_SYM_1 = arrayOf('\'', '=', '.', ';', '\\', '/', ',', '-')
@@ -120,6 +226,10 @@ class InputEngine {
             KEY_PGUP, KEY_VOL_UP, KEY_END, KEY_DELETE, KEY_PGDN, KEY_INSERT, KEY_HOME, KEY_VOL_DOWN
         )
 
+        /**
+         * Returns the shifted symbol character corresponding to standard US QWERTY keyboard symbols.
+         */
+        @JvmStatic
         fun shiftSymbol(c: Char): Char {
             return when (c) {
                 '1' -> '!'
@@ -147,6 +257,79 @@ class InputEngine {
             }
         }
 
+        /**
+         * Reads an analog trigger axis value with graceful fallback for gamepads reporting
+         * triggers as alternate axes (e.g. BRAKE/GAS vs LTRIGGER/RTRIGGER).
+         */
+        @JvmStatic
+        fun readTriggerAxis(event: MotionEvent, primaryAxis: Int, fallbackAxis: Int): Float {
+            val dev = event.device
+            return if (dev?.getMotionRange(primaryAxis) != null) {
+                event.getAxisValue(primaryAxis)
+            } else if (dev?.getMotionRange(fallbackAxis) != null) {
+                event.getAxisValue(fallbackAxis)
+            } else {
+                event.getAxisValue(primaryAxis)
+            }
+        }
+
+        /**
+         * Resolves left analog stick (X, Y) deflection from standard AXIS_X and AXIS_Y.
+         */
+        @JvmStatic
+        fun readLeftStick(event: MotionEvent): Pair<Float, Float> {
+            val lx = event.getAxisValue(MotionEvent.AXIS_X)
+            val ly = event.getAxisValue(MotionEvent.AXIS_Y)
+            return Pair(lx, ly)
+        }
+
+        /**
+         * Resolves right analog stick (X, Y) deflection, supporting controllers that map
+         * the right stick to Z/RZ or RX/RY.
+         */
+        @JvmStatic
+        fun readRightStick(event: MotionEvent): Pair<Float, Float> {
+            val rawZ = event.getAxisValue(MotionEvent.AXIS_Z)
+            val rawRZ = event.getAxisValue(MotionEvent.AXIS_RZ)
+            val rawRX = event.getAxisValue(MotionEvent.AXIS_RX)
+            val rawRY = event.getAxisValue(MotionEvent.AXIS_RY)
+            val rx = if (rawZ != 0f || rawRZ != 0f) rawZ else rawRX
+            val ry = if (rawZ != 0f || rawRZ != 0f) rawRZ else rawRY
+            return Pair(rx, ry)
+        }
+
+        /**
+         * Evaluates a hysteresis threshold check.
+         *
+         * When [inverted] is false:
+         *   If currently active, requires `value >= release` to stay active.
+         *   If currently inactive, requires `value >= engage` to engage.
+         *
+         * When [inverted] is true (for negative stick deflection):
+         *   If currently active, requires `value <= -release` to stay active.
+         *   If currently inactive, requires `value <= -engage` to engage.
+         */
+        @JvmStatic
+        fun hysteresis(
+            active: Boolean,
+            value: Float,
+            engage: Float,
+            release: Float,
+            inverted: Boolean = false
+        ): Boolean {
+            return if (inverted) {
+                if (active) value <= -release else value <= -engage
+            } else {
+                if (active) value >= release else value >= engage
+            }
+        }
+
+        /**
+         * Decodes a raw integer emitted by the native Zig engine or Kotlin fallback into
+         * a structured [ProcessedEvent].
+         *
+         * Returns `null` if the raw event represents an internal layer navigation or page toggle.
+         */
         @JvmStatic
         fun decode(rawValue: Int): ProcessedEvent? {
             if (rawValue == 0) return null
@@ -243,11 +426,26 @@ class InputEngine {
     private var isR2ButtonDown: Boolean = false
     private var isL1ButtonDown: Boolean = false
 
+    var lastLeftStickX: Float = 0f
+        private set
+    var lastLeftStickY: Float = 0f
+        private set
+
     // Left Stick modifier states with hysteresis
     private var leftStickShiftActive: Boolean = false
     private var leftStickCtrlActive: Boolean = false
     private var leftStickAltActive: Boolean = false
     private var leftStickSuperActive: Boolean = false
+
+    val isLeftStickShiftActive: Boolean get() = leftStickShiftActive
+    val isLeftStickCtrlActive: Boolean get() = leftStickCtrlActive
+    val isLeftStickAltActive: Boolean get() = leftStickAltActive
+    val isLeftStickSuperActive: Boolean get() = leftStickSuperActive
+
+    val isShiftActive: Boolean get() = (currentButtonMask and FLAG_SHIFT) != 0
+    val isCtrlActive: Boolean get() = (currentButtonMask and FLAG_CTRL) != 0
+    val isAltActive: Boolean get() = (currentButtonMask and FLAG_ALT) != 0
+    val isSuperActive: Boolean get() = (currentButtonMask and FLAG_SUPER) != 0
 
     // Analog triggers
     private var l2TriggerActive: Boolean = false
@@ -263,6 +461,17 @@ class InputEngine {
             }
         }
 
+    /**
+     * Represents a fully resolved and decoded input action ready for system dispatch.
+     *
+     * @property rawValue The raw 32-bit packed representation from native Zig or fallback engine.
+     * @property charCode The isolated character code (Unicode or SpecialKey constant).
+     * @property char The printable char representation (or 0 for non-printable keys).
+     * @property isShift Whether Shift modifier is active.
+     * @property isCtrl Whether Ctrl modifier is active.
+     * @property isAlt Whether Alt modifier is active.
+     * @property isSuper Whether Super / Windows key modifier is active.
+     */
     data class ProcessedEvent(
         val rawValue: Int,
         val charCode: Int,
@@ -273,6 +482,18 @@ class InputEngine {
         val isSuper: Boolean = false
     )
 
+    /**
+     * Calculates the sector index (0..7) based on analog stick (X, Y) coordinates.
+     *
+     * Angles are measured clockwise from North (12 o'clock, 0°).
+     *
+     * In [useSymmetricSlices] mode:
+     * - Each sector spans exactly 45° (North: 337.5° to 22.5°).
+     *
+     * In asymmetric mode:
+     * - Cardinals (North, East, South, West) span 60°.
+     * - Diagonals span 30°.
+     */
     fun calculateSlice(x: Float, y: Float): Int {
         val rad = atan2(x.toDouble(), -y.toDouble())
         var deg = Math.toDegrees(rad).toFloat()
@@ -280,7 +501,7 @@ class InputEngine {
 
         return if (useSymmetricSlices) {
             when {
-                deg >= 337.5f || deg < 22.5f -> 0
+                deg !in 22.5f..<337.5f -> 0
                 deg < 67.5f -> 1
                 deg < 112.5f -> 2
                 deg < 157.5f -> 3
@@ -291,7 +512,7 @@ class InputEngine {
             }
         } else {
             when {
-                deg >= 330f || deg < 30f -> 0
+                deg !in 30f..<330f -> 0
                 deg < 60f -> 1
                 deg < 120f -> 2
                 deg < 150f -> 3
@@ -317,26 +538,53 @@ class InputEngine {
         if (isSecondLayerActive) {
             isSecondLayerActive = false
         } else if (currentLayer != Layer.BASE) {
-            currentLayer = Layer.BASE
+            backToBaseLayer()
         }
         return null
     }
 
+    /**
+     * Immediately returns to the [Layer.BASE] layer and clears second page state.
+     */
     fun backToBaseLayer() {
         currentLayer = Layer.BASE
         isSecondLayerActive = false
+        if (isNativeLoaded) {
+            try { backToBase() } catch (_: UnsatisfiedLinkError) {}
+        }
     }
 
+    /**
+     * Toggles between secondary and primary sublayer pages.
+     */
+    fun toggleSecondLayer(): Boolean {
+        if (isNativeLoaded) {
+            try {
+                val newSecond = toggleSecondPage()
+                isSecondLayerActive = newSecond
+                return newSecond
+            } catch (_: UnsatisfiedLinkError) {}
+        }
+        isSecondLayerActive = !isSecondLayerActive
+        return isSecondLayerActive
+    }
+
+    /**
+     * Explicitly forces active layer to [layer] and resets second page state.
+     */
     fun setLayer(layer: Layer) {
         currentLayer = layer
         isSecondLayerActive = false
     }
 
+    /**
+     * Completely resets all internal engine states, returning to [Layer.BASE].
+     */
     fun resetAll() {
-        currentLayer = Layer.BASE
+        backToBaseLayer()
         isDeflected = false
-        isSecondLayerActive = false
         aimedSlice = 0
+        resetTracking()
         if (isNativeLoaded) {
             try {
                 resetState()
@@ -389,7 +637,7 @@ class InputEngine {
                 )
             }
             if (currentLayer in listOf(Layer.Q_Z, Layer.MORE_SYM, Layer.NUM_SYM, Layer.FN)) {
-                fallbackSecondPage = !fallbackSecondPage
+                toggleSecondLayer()
                 return null
             }
             return null
@@ -479,88 +727,58 @@ class InputEngine {
     }
 
     /**
-     * Process Left Stick deflection for modifier keys.
+     * Evaluates Left Stick deflection for modifier keys and flick-release standalone Super key.
+     *
+     * - Tilt Up: Shift
+     * - Tilt Down: Ctrl
+     * - Tilt Left: Alt
+     * - Tilt Right: Super (Windows)
+     * - Flick Right & Release: Standalone Super (Windows) key
+     *
+     * @param lx Left stick horizontal axis (-1.0f .. 1.0f).
+     * @param ly Left stick vertical axis (-1.0f .. 1.0f).
+     * @return Standalone [ProcessedEvent] if a flick-and-release Super gesture completed, null otherwise.
      */
-    fun onLeftStickMotion(lx: Float, ly: Float): Boolean {
-        val ENGAGE = 0.35f
-        val RELEASE = 0.20f
+    fun onLeftStickMotion(lx: Float, ly: Float): ProcessedEvent? {
+        lastLeftStickX = lx
+        lastLeftStickY = ly
 
         val prevShift = leftStickShiftActive
         val prevCtrl = leftStickCtrlActive
         val prevAlt = leftStickAltActive
         val prevSuper = leftStickSuperActive
 
-        leftStickShiftActive = if (leftStickShiftActive) ly <= -RELEASE else ly <= -ENGAGE
-        leftStickCtrlActive = if (leftStickCtrlActive) ly >= RELEASE else ly >= ENGAGE
-        leftStickAltActive = if (leftStickAltActive) lx <= -RELEASE else lx <= -ENGAGE
-        leftStickSuperActive = if (leftStickSuperActive) lx >= RELEASE else lx >= ENGAGE
+        leftStickShiftActive = hysteresis(leftStickShiftActive, ly, LEFT_STICK_ENGAGE, LEFT_STICK_RELEASE, inverted = true)
+        leftStickCtrlActive = hysteresis(leftStickCtrlActive, ly, LEFT_STICK_ENGAGE, LEFT_STICK_RELEASE)
+        leftStickAltActive = hysteresis(leftStickAltActive, lx, LEFT_STICK_ENGAGE, LEFT_STICK_RELEASE, inverted = true)
+        leftStickSuperActive = hysteresis(leftStickSuperActive, lx, LEFT_STICK_ENGAGE, LEFT_STICK_RELEASE)
 
+        // When Super engages on a new tilt, clear the typing flag so flick-release can trigger
         if (!prevSuper && leftStickSuperActive) {
             leftStickSuperEngaged = true
             hasTypedDuringSuperEngaged = false
         }
+
+        val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+        currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
+        currentButtonMask = if (leftStickCtrlActive) currentButtonMask or FLAG_CTRL else currentButtonMask and FLAG_CTRL.inv()
+        currentButtonMask = if (leftStickAltActive) currentButtonMask or FLAG_ALT else currentButtonMask and FLAG_ALT.inv()
+        currentButtonMask = if (leftStickSuperActive) currentButtonMask or FLAG_SUPER else currentButtonMask and FLAG_SUPER.inv()
 
         val changed = (prevShift != leftStickShiftActive) ||
                 (prevCtrl != leftStickCtrlActive) ||
                 (prevAlt != leftStickAltActive) ||
                 (prevSuper != leftStickSuperActive)
 
-        if (changed) {
-            val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
-            currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
-            currentButtonMask = if (leftStickCtrlActive) currentButtonMask or FLAG_CTRL else currentButtonMask and FLAG_CTRL.inv()
-            currentButtonMask = if (leftStickAltActive) currentButtonMask or FLAG_ALT else currentButtonMask and FLAG_ALT.inv()
-            currentButtonMask = if (leftStickSuperActive) currentButtonMask or FLAG_SUPER else currentButtonMask and FLAG_SUPER.inv()
-
-            if (isNativeLoaded) {
-                try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
-            }
+        if (changed && isNativeLoaded) {
+            try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
         }
-        return changed
-    }
 
-    fun onLeftStickRelease(ic: InputConnection?): Boolean {
-        var dispatched = false
-        if (leftStickSuperEngaged && !hasTypedDuringSuperEngaged) {
-            val superDown = KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_META_LEFT, 0, KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)
-            val superUp = KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0, KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON)
-            ic?.sendKeyEvent(superDown)
-            ic?.sendKeyEvent(superUp)
-            dispatched = true
-        }
-        leftStickSuperEngaged = false
-        hasTypedDuringSuperEngaged = false
-        return dispatched
-    }
-
-    /**
-     * Handles gamepad analog stick movements and analog trigger pressures.
-     * Motion alone NEVER emits a character.
-     */
-    fun onMotionEvent(event: MotionEvent): ProcessedEvent? {
-        // 1. Read Left Stick as the Modifier & Utility Joystick:
-        val lx = event.getAxisValue(MotionEvent.AXIS_X)
-        val ly = event.getAxisValue(MotionEvent.AXIS_Y)
-
-        val ENGAGE = 0.35f
-        val RELEASE = 0.20f
-
-        leftStickShiftActive = if (leftStickShiftActive) ly <= -RELEASE else ly <= -ENGAGE
-        leftStickCtrlActive = if (leftStickCtrlActive) ly >= RELEASE else ly >= ENGAGE
-        leftStickAltActive = if (leftStickAltActive) lx <= -RELEASE else lx <= -ENGAGE
-        leftStickSuperActive = if (leftStickSuperActive) lx >= RELEASE else lx >= ENGAGE
-
-        currentButtonMask = if (leftStickCtrlActive) currentButtonMask or FLAG_CTRL else currentButtonMask and FLAG_CTRL.inv()
-        currentButtonMask = if (leftStickAltActive) currentButtonMask or FLAG_ALT else currentButtonMask and FLAG_ALT.inv()
-        currentButtonMask = if (leftStickSuperActive) currentButtonMask or FLAG_SUPER else currentButtonMask and FLAG_SUPER.inv()
-
-        // Track flick-and-release tap on Left Stick for standalone Super (Windows) key
+        // Check for flick-and-release tap on Left Stick for standalone Super (Windows) key
         var standaloneSuperEvent: ProcessedEvent? = null
-        if (leftStickSuperActive) {
-            leftStickSuperEngaged = true
-        } else {
+        if (!leftStickSuperActive && leftStickSuperEngaged) {
             val lRsq = (lx * lx) + (ly * ly)
-            if (leftStickSuperEngaged && lRsq < 0.20f * 0.20f) {
+            if (lRsq < LEFT_STICK_RELEASE * LEFT_STICK_RELEASE) {
                 if (!hasTypedDuringSuperEngaged) {
                     standaloneSuperEvent = ProcessedEvent(
                         rawValue = KEY_SUPER or MOD_SUPER,
@@ -577,27 +795,24 @@ class InputEngine {
             }
         }
 
+        return standaloneSuperEvent
+    }
+
+    /**
+     * Handles gamepad analog stick movements and analog trigger pressures.
+     * Motion alone NEVER emits a character.
+     */
+    fun onMotionEvent(event: MotionEvent): ProcessedEvent? {
+        // 1. Read Left Stick as the Modifier & Utility Joystick:
+        val (lx, ly) = readLeftStick(event)
+        val standaloneSuperEvent = onLeftStickMotion(lx, ly)
+
         // 2. Analog triggers: Left Trigger (L2) is Shift, Right Trigger (R2) is Mouse Layer
-        val hasLTrigger = event.device?.getMotionRange(MotionEvent.AXIS_LTRIGGER) != null
-        val l2Pressure = if (hasLTrigger) {
-            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
-        } else if (event.device?.getMotionRange(MotionEvent.AXIS_BRAKE) != null) {
-            event.getAxisValue(MotionEvent.AXIS_BRAKE)
-        } else {
-            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
-        }
+        val l2Pressure = readTriggerAxis(event, MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_BRAKE)
+        val r2Pressure = readTriggerAxis(event, MotionEvent.AXIS_RTRIGGER, MotionEvent.AXIS_GAS)
 
-        val hasRTrigger = event.device?.getMotionRange(MotionEvent.AXIS_RTRIGGER) != null
-        val r2Pressure = if (hasRTrigger) {
-            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-        } else if (event.device?.getMotionRange(MotionEvent.AXIS_GAS) != null) {
-            event.getAxisValue(MotionEvent.AXIS_GAS)
-        } else {
-            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-        }
-
-        l2TriggerActive = if (l2TriggerActive) l2Pressure >= 0.25f else l2Pressure >= TRIGGER_ENGAGEMENT_THRESHOLD
-        r2TriggerActive = if (r2TriggerActive) r2Pressure >= 0.25f else r2Pressure >= TRIGGER_ENGAGEMENT_THRESHOLD
+        l2TriggerActive = hysteresis(l2TriggerActive, l2Pressure, TRIGGER_ENGAGEMENT_THRESHOLD, TRIGGER_RELEASE_THRESHOLD)
+        r2TriggerActive = hysteresis(r2TriggerActive, r2Pressure, TRIGGER_ENGAGEMENT_THRESHOLD, TRIGGER_RELEASE_THRESHOLD)
 
         val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
         currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
@@ -606,13 +821,7 @@ class InputEngine {
         currentButtonMask = if (r2Active) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
 
         // 3. Read Right Stick (Radial Dial):
-        val rawZ = event.getAxisValue(MotionEvent.AXIS_Z)
-        val rawRZ = event.getAxisValue(MotionEvent.AXIS_RZ)
-        val rawRX = event.getAxisValue(MotionEvent.AXIS_RX)
-        val rawRY = event.getAxisValue(MotionEvent.AXIS_RY)
-
-        val rx = if (rawZ != 0f || rawRZ != 0f) rawZ else rawRX
-        val ry = if (rawZ != 0f || rawRZ != 0f) rawRZ else rawRY
+        val (rx, ry) = readRightStick(event)
 
         lastStickX = rx
         lastStickY = ry
@@ -640,6 +849,16 @@ class InputEngine {
         return standaloneSuperEvent
     }
 
+    /**
+     * Handles hardware button presses that control modifiers and layer traversal.
+     *
+     * - [KeyEvent.KEYCODE_BUTTON_THUMBL] (L3): Toggles Caps Lock.
+     * - [KeyEvent.KEYCODE_BUTTON_L1] (L1): Returns to previous layer tier or Base.
+     * - [KeyEvent.KEYCODE_BUTTON_R2] (R2): Engages Mouse Layer hold.
+     * - [KeyEvent.KEYCODE_BUTTON_L2] (L2): Engages Shift hold.
+     *
+     * @return `true` if the event was intercepted and consumed by the engine.
+     */
     fun onKeyEvent(keyCode: Int, isDown: Boolean): Boolean {
         if (isDown) {
             hasTypedDuringSuperEngaged = true
@@ -672,7 +891,7 @@ class InputEngine {
             if (!isDown) {
                 r2TriggerActive = false
             }
-            val r2Active = isR2ButtonDown || r2TriggerActive
+            val r2Active = isR2ButtonDown
             currentButtonMask = if (r2Active) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
             if (isNativeLoaded) {
                 try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
@@ -694,31 +913,18 @@ class InputEngine {
         return false
     }
 
-    fun onTrigger(axis: Int, value: Float): Boolean {
-        val isEngaged = value >= TRIGGER_ENGAGEMENT_THRESHOLD
-        var changed = false
-
-        if (axis == MotionEvent.AXIS_BRAKE || axis == MotionEvent.AXIS_LTRIGGER) {
-            if (l2TriggerActive != isEngaged) {
-                l2TriggerActive = isEngaged
-                val shiftActive = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
-                currentButtonMask = if (shiftActive) currentButtonMask or FLAG_SHIFT else currentButtonMask and FLAG_SHIFT.inv()
-                changed = true
-            }
-        } else if (axis == MotionEvent.AXIS_GAS || axis == MotionEvent.AXIS_RTRIGGER) {
-            if (r2TriggerActive != isEngaged) {
-                r2TriggerActive = isEngaged
-                currentButtonMask = if (isR2ButtonDown || r2TriggerActive) currentButtonMask or FLAG_R2_HOLD else currentButtonMask and FLAG_R2_HOLD.inv()
-                changed = true
-            }
-        }
-
-        if (changed && isNativeLoaded) {
-            try { processInput(lastStickX, lastStickY, currentButtonMask) } catch (_: UnsatisfiedLinkError) {}
-        }
-        return changed
-    }
-
+    /**
+     * Dispatches a resolved [ProcessedEvent] to the system input method framework via [ic].
+     *
+     * Correctly formats:
+     * - Standalone Super / Windows Key clicks.
+     * - Win+key combo shortcuts.
+     * - Alt/Meta VT100 ANSI sequences.
+     * - Ctrl shortcuts (Copy, Cut, Paste, Undo, Select All) and ASCII control characters.
+     * - Function keys (F1..F12), navigation keys (Home, End, PgUp, PgDn, Insert), and Volume controls.
+     * - Custom Macro slots (0..7) via [MacroManager].
+     * - Standard Unicode characters.
+     */
     fun dispatchEvent(ic: InputConnection?, event: ProcessedEvent) {
         if (ic == null) return
 
@@ -767,30 +973,64 @@ class InputEngine {
                 }
             }
 
-            // Alt / Meta modifier: Sends VT100 ANSI ESC sequence (\u001b + char)
+            // Alt / Meta modifier: Sends standard Alt+key or VT100 ANSI ESC sequence (\u001b + char)
             event.isAlt -> {
-                ic.commitText("\u001b${event.char}", 1)
+                val keyCode = when (event.char.lowercaseChar()) {
+                    in 'a'..'z' -> KeyEvent.KEYCODE_A + (event.char.lowercaseChar() - 'a')
+                    in '0'..'9' -> KeyEvent.KEYCODE_0 + (event.char - '0')
+                    ' ' -> KeyEvent.KEYCODE_SPACE
+                    '\t' -> KeyEvent.KEYCODE_TAB
+                    '\n' -> KeyEvent.KEYCODE_ENTER
+                    else -> KeyEvent.KEYCODE_UNKNOWN
+                }
+                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+                    var metaState = KeyEvent.META_ALT_ON
+                    if (event.isShift) metaState = metaState or KeyEvent.META_SHIFT_ON
+                    if (event.isCtrl) metaState = metaState or KeyEvent.META_CTRL_ON
+                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, metaState))
+                } else {
+                    ic.commitText("\u001b${event.char}", 1)
+                }
             }
 
-            // Ctrl modifier
+            // Ctrl modifier: Supports standard editing shortcuts (A/C/X/V/Z) and meta key events
             event.isCtrl -> {
-                when (event.char.lowercaseChar()) {
-                    'a' -> ic.performContextMenuAction(android.R.id.selectAll)
-                    'c' -> ic.performContextMenuAction(android.R.id.copy)
-                    'x' -> ic.performContextMenuAction(android.R.id.cut)
-                    'v' -> ic.performContextMenuAction(android.R.id.paste)
-                    'z' -> ic.performContextMenuAction(android.R.id.undo)
+                val isCharA = event.charCode == 1 || event.char == 'a' || event.char == 'A'
+                val isCharC = event.charCode == 3 || event.char == 'c' || event.char == 'C'
+                val isCharX = event.charCode == 24 || event.char == 'x' || event.char == 'X'
+                val isCharV = event.charCode == 22 || event.char == 'v' || event.char == 'V'
+                val isCharZ = event.charCode == 26 || event.char == 'z' || event.char == 'Z'
+
+                when {
+                    isCharA -> ic.performContextMenuAction(android.R.id.selectAll)
+                    isCharC -> ic.performContextMenuAction(android.R.id.copy)
+                    isCharX -> ic.performContextMenuAction(android.R.id.cut)
+                    isCharV -> ic.performContextMenuAction(android.R.id.paste)
+                    isCharZ -> ic.performContextMenuAction(android.R.id.undo)
                     else -> {
-                        val ctrlPayload = if (event.charCode in 1..26) {
-                            event.charCode.toChar().toString()
-                        } else if (event.char in 'a'..'z') {
-                            (event.char.code - 'a'.code + 1).toChar().toString()
-                        } else if (event.char in 'A'..'Z') {
-                            (event.char.code - 'A'.code + 1).toChar().toString()
-                        } else {
-                            event.char.toString()
+                        val keyCode = when {
+                            event.charCode in 1..26 -> KeyEvent.KEYCODE_A + (event.charCode - 1)
+                            event.char.lowercaseChar() in 'a'..'z' -> KeyEvent.KEYCODE_A + (event.char.lowercaseChar() - 'a')
+                            event.char in '0'..'9' -> KeyEvent.KEYCODE_0 + (event.char - '0')
+                            event.char == ' ' -> KeyEvent.KEYCODE_SPACE
+                            event.char == '\t' -> KeyEvent.KEYCODE_TAB
+                            event.char == '\n' -> KeyEvent.KEYCODE_ENTER
+                            else -> KeyEvent.KEYCODE_UNKNOWN
                         }
-                        ic.commitText(ctrlPayload, 1)
+                        if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
+                            var metaState = KeyEvent.META_CTRL_ON
+                            if (event.isShift) metaState = metaState or KeyEvent.META_SHIFT_ON
+                            ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+                            ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, metaState))
+                        } else {
+                            val ctrlPayload = if (event.char in 'a'..'z') {
+                                (event.char.code - 'a'.code + 1).toChar().toString()
+                            } else {
+                                event.char.toString()
+                            }
+                            ic.commitText(ctrlPayload, 1)
+                        }
                     }
                 }
             }
@@ -824,13 +1064,10 @@ class InputEngine {
                 val keyCode = when (event.charCode) {
                     KEY_VOL_UP -> KeyEvent.KEYCODE_VOLUME_UP
                     KEY_VOL_DOWN -> KeyEvent.KEYCODE_VOLUME_DOWN
-                    KEY_VOL_MUTE -> KeyEvent.KEYCODE_VOLUME_MUTE
-                    else -> KeyEvent.KEYCODE_UNKNOWN
+                    else -> KeyEvent.KEYCODE_VOLUME_MUTE
                 }
-                if (keyCode != KeyEvent.KEYCODE_UNKNOWN) {
-                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, 0))
-                    ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, 0))
-                }
+                ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, 0))
+                ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, 0))
             }
 
             // Macro Keys (KEY_MACRO_0 through KEY_MACRO_7)
@@ -846,6 +1083,9 @@ class InputEngine {
         }
     }
 
+    /**
+     * Resets all internal button, trigger, and deflection tracking variables.
+     */
     fun resetTracking() {
         leftStickSuperEngaged = false
         hasTypedDuringSuperEngaged = false
@@ -856,6 +1096,10 @@ class InputEngine {
         leftStickCtrlActive = false
         leftStickAltActive = false
         leftStickSuperActive = false
+        lastLeftStickX = 0f
+        lastLeftStickY = 0f
+        lastStickX = 0f
+        lastStickY = 0f
         l2TriggerActive = false
         r2TriggerActive = false
         isDeflected = false

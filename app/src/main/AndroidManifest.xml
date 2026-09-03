@@ -14,7 +14,7 @@
         android:icon="@android:drawable/ic_dialog_info"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        android:theme="@style/Theme.RadPad">
 
         <!-- Setup & Test Launcher Activity -->
         <activity

@@ -2,47 +2,62 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#12121E"
+    android:background="@color/surface_primary"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="@dimen/spacing_lg">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <!-- App Branding Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🎮 RadPad"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Zero-latency snappy radial keyboard powered by bare-metal Zig"
-            android:textColor="#A0A0B8"
-            android:textSize="13sp" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-        <!-- Live Controller Status Banner -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎮 RadPad"
+                    android:textColor="@color/text_primary"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Gamepad IME &amp; Radial HUD powered by Zig native engine"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Live Controller Telemetry Card -->
         <LinearLayout
             android:id="@+id/banner_controller_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="#1E2030"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:background="@drawable/bg_card_surface"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="@dimen/spacing_md">
 
             <TextView
                 android:id="@+id/tv_controller_status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🔍 Checking for Game Controller..."
-                android:textColor="#F9E2AF"
+                android:textColor="@color/status_checking"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -50,9 +65,9 @@
                 android:id="@+id/tv_controller_detail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
                 android:text="Aim Right Stick. Press R1 to Select. L1 returns to Base. Hold R2 for 2nd tier."
-                android:textColor="#BAC2DE"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <TextView
@@ -61,7 +76,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="Stick X: 0.00 | Y: 0.00 | Triggers: None"
-                android:textColor="#A6E3A1"
+                android:textColor="@color/status_connected"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -72,16 +87,98 @@
             android:layout_width="220dp"
             android:layout_height="220dp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginVertical="12dp" />
+            android:layout_marginVertical="@dimen/spacing_md" />
 
-        <!-- Settings: Equal Slices Symmetry Switch -->
+        <!-- Setup Wizard Quick Actions -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚡ QUICK SETUP"
+            android:textColor="@color/accent_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <!-- Step 1 Button -->
+        <Button
+            android:id="@+id/btn_enable_ime"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:backgroundTint="@color/button_step1"
+            android:text="Step 1: Enable in Android Settings"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Step 2 Button -->
+        <Button
+            android:id="@+id/btn_select_ime"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:backgroundTint="@color/button_step2"
+            android:text="Step 2: Choose as Active Keyboard"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Step 3 Button: Always-On Floating Overlay -->
+        <Button
+            android:id="@+id/btn_floating_hud"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:backgroundTint="@color/button_launch"
+            android:text="📌 Launch Always-On Floating HUD"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Test Input Box -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_md"
+            android:text="TEST TYPING AREA"
+            android:textColor="@color/accent_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/et_test_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_input_field"
+            android:hint="Tap here to test typing with RadPad..."
+            android:minHeight="54dp"
+            android:padding="@dimen/spacing_md"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="14sp" />
+
+        <!-- Settings Card -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_lg"
+            android:text="RADIAL &amp; SYSTEM SETTINGS"
+            android:textColor="@color/accent_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#1B1D2E"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card_surface"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="@dimen/spacing_md">
 
+            <!-- Symmetry Setting Switch -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -93,14 +190,16 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Equal 45° Slices (Symmetric)"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
-                <Switch
+                <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/sw_symmetric_slices"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:thumbTint="@color/accent_primary"
+                    android:trackTint="@color/border_primary"
                     android:checked="true" />
             </LinearLayout>
 
@@ -108,19 +207,18 @@
                 android:id="@+id/tv_symmetry_desc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="ON: All 8 directions have equal 45° sectors. OFF: Wide 60° cardinals (N, E, S, W) and 30° diagonals."
-                android:textColor="#888B9E"
+                android:layout_marginTop="3dp"
+                android:text="ON: All 8 directions have equal 45° sectors. OFF: Wide 60° cardinals and 30° diagonals."
+                android:textColor="@color/text_tertiary"
                 android:textSize="11sp" />
 
-
-            <!-- Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginVertical="10dp"
-                android:background="#2E3440" />
+                android:background="@color/border_subtle" />
 
+            <!-- Theme Selector -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -131,34 +229,34 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Color Scheme"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:text="Color Scheme Theme"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <Spinner
                     android:id="@+id/spn_color_scheme"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Select from: Tokyo Night, Gruvbox, Dracula, or Black &amp; White."
-                android:textColor="#888B9E"
+                android:layout_marginTop="3dp"
+                android:text="Tokyo Night, Gruvbox, Dracula, or OLED Monochrome."
+                android:textColor="@color/text_tertiary"
                 android:textSize="11sp" />
 
-            <!-- Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginVertical="10dp"
-                android:background="#2E3440" />
+                android:background="@color/border_subtle" />
 
+            <!-- Select / Share Action -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -169,34 +267,34 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Select / Share Button Action"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:text="Select / Share Button"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <Spinner
                     android:id="@+id/spn_select_action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Select button: Toggle HUD (Default), Hide Keyboard, or Toggle HUD + Hide Keyboard."
-                android:textColor="#888B9E"
+                android:layout_marginTop="3dp"
+                android:text="Toggle HUD (Default), Hide Keyboard, or Toggle HUD + Hide Keyboard."
+                android:textColor="@color/text_tertiary"
                 android:textSize="11sp" />
 
-            <!-- Divider -->
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginVertical="10dp"
-                android:background="#2E3440" />
+                android:background="@color/border_subtle" />
 
+            <!-- Start / Options Action -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -207,51 +305,51 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Start / Options Button Action"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
+                    android:text="Start / Options Button"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <Spinner
                     android:id="@+id/spn_start_action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Start button: Hide Keyboard (Default), Toggle HUD, or Toggle HUD + Hide Keyboard."
-                android:textColor="#888B9E"
+                android:layout_marginTop="3dp"
+                android:text="Hide Keyboard (Default), Toggle HUD, or Toggle HUD + Hide Keyboard."
+                android:textColor="@color/text_tertiary"
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Virtual Mouse Layer Settings Card -->
+        <!-- Virtual Mouse Layer Card -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_lg"
+            android:text="MOUSE LAYER (HOLD R2)"
+            android:textColor="@color/accent_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="#1B1D2E"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card_surface"
             android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🐭 Virtual Mouse Layer (Hold R2)"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+            android:padding="@dimen/spacing_md">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
                 android:text="Hold R2 to steer cursor with Right Stick. D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click."
-                android:textColor="#888B9E"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <LinearLayout
@@ -267,7 +365,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="System Clicks: Checking..."
-                    android:textColor="#F38BA8"
+                    android:textColor="@color/accent_danger"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
@@ -275,46 +373,46 @@
                     android:id="@+id/btn_enable_accessibility"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
-                    android:backgroundTint="#7AA2F7"
+                    android:backgroundTint="@color/accent_primary"
                     android:paddingHorizontal="12dp"
                     android:text="Enable Clicks"
                     android:textAllCaps="false"
-                    android:textColor="#0F101A"
+                    android:textColor="@android:color/white"
                     android:textSize="12sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
         <!-- Macro Layer Settings Card -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_lg"
+            android:text="⚡ MACRO LAYER CONFIGURATION (8 SLOTS)"
+            android:textColor="@color/accent_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="#1B1D2E"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card_surface"
             android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚡ Custom Macro Layer (8 Radial Slots)"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+            android:padding="@dimen/spacing_md">
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:layout_marginBottom="10dp"
-                android:text="Assigned to SW sector on Base layer. Configure shortcuts and key combos for all 8 directions:"
-                android:textColor="#888B9E"
-                android:textSize="11sp" />
+                android:text="Assign built-in shortcuts or custom key/text macros to the 8 compass directions:"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
 
             <!-- Slot 0: North -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingVertical="3dp">
@@ -322,28 +420,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 1: North (0°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↑ Slot 1: North (0°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_0"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_0"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -359,28 +456,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 2: NorthEast (45°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↗ Slot 2: NorthEast (45°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_1"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -396,28 +492,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 3: East (90°)"
-                    android:textColor="#BAC2DE"
+                    android:text="→ Slot 3: East (90°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_2"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -433,28 +528,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 4: SouthEast (135°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↘ Slot 4: SouthEast (135°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_3"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_3"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -470,28 +564,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 5: South (180°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↓ Slot 5: South (180°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_4"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_4"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -507,28 +600,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 6: SouthWest (225°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↙ Slot 6: SouthWest (225°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_5"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_5"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -544,28 +636,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 7: West (270°)"
-                    android:textColor="#BAC2DE"
+                    android:text="← Slot 7: West (270°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_6"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_6"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -581,120 +672,82 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Slot 8: NorthWest (315°)"
-                    android:textColor="#BAC2DE"
+                    android:text="↖ Slot 8: NorthWest (315°)"
+                    android:textColor="@color/text_primary"
                     android:textSize="12sp" />
                 <Spinner
                     android:id="@+id/spn_macro_7"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:backgroundTint="#7AA2F7"
-                    android:popupBackground="#1E1E2E" />
-
+                    android:backgroundTint="@color/accent_primary"
+                    android:popupBackground="@color/surface_card" />
                 <Button
                     android:id="@+id/btn_macro_custom_7"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
+                    android:layout_height="34dp"
                     android:layout_marginStart="6dp"
-                    android:backgroundTint="#2E3440"
+                    android:backgroundTint="@color/surface_elevated"
                     android:minWidth="0dp"
                     android:minHeight="0dp"
                     android:paddingHorizontal="10dp"
                     android:text="Edit"
                     android:textAllCaps="false"
-                    android:textColor="#88C0D0"
+                    android:textColor="@color/accent_info"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
-
-        <!-- Step 1 Button -->
-        <Button
-            android:id="@+id/btn_enable_ime"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="12dp"
-            android:backgroundTint="#00439C"
-            android:text="Step 1: Enable in Settings"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Step 2 Button -->
-        <Button
-            android:id="@+id/btn_select_ime"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="8dp"
-            android:backgroundTint="#2E3440"
-            android:text="Step 2: Choose as Active Keyboard"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Step 3 Button: Always-On Floating Overlay -->
-        <Button
-            android:id="@+id/btn_floating_hud"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="8dp"
-            android:backgroundTint="#2E7D32"
-            android:text="📌 Launch Always-On Floating HUD"
-            android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Test Input Box -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Test Typing Area:"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/et_test_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:background="#1E1E2E"
-            android:hint="Tap here to test typing with RadPad..."
-            android:minHeight="64dp"
-            android:padding="12dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#70708C"
-            android:textSize="15sp" />
-
-        <!-- Complete RadPad Controller Button Map -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="🎮 Full Controller Button Mappings:"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
+        <!-- Collapsible Controller Button Mapping Accordion Header -->
         <LinearLayout
+            android:id="@+id/btn_toggle_button_map"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="#161826"
+            android:layout_marginTop="@dimen/spacing_lg"
+            android:background="@drawable/bg_card_surface"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_md">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🎮 Controller Button Mapping Reference"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/icon_chevron"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▼"
+                android:textColor="@color/accent_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Collapsible Controller Button Mapping Content -->
+        <LinearLayout
+            android:id="@+id/container_button_map"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_card_surface"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="@dimen/spacing_md"
+            android:visibility="gone">
 
             <!-- Face Buttons -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="FACE BUTTONS"
-                android:textColor="#7AA2F7"
+                android:textColor="@color/accent_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -704,7 +757,7 @@
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
                 android:text="• ▢ (Square): Backspace (Hold L2 / Shift for Real Forward Delete!)\n• ✕ (Cross): Space (Primary Action Button, supports Win/Ctrl/Alt+Space)\n• △ (Triangle): Enter / Newline (supports Win/Ctrl/Alt+Enter)\n• ○ (Circle): Tab (Indent / Field navigation, supports Win/Alt/Ctrl+Tab)"
-                android:textColor="#C0CAF5"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <!-- Bumpers & Triggers -->
@@ -713,7 +766,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="BUMPERS &amp; TRIGGERS"
-                android:textColor="#7AA2F7"
+                android:textColor="@color/accent_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -723,7 +776,7 @@
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
                 android:text="• R1: Select / Commit (Right Bumper: Enter layer on Base, or type character inside layer)\n• Center R1: Toggle 2nd Page (Center stick inside Q-Z, SYM, NUM, FN and press R1 to toggle 2nd page!)\n• L1: Return to Base (Left Bumper: Instantly exits any sublayer back to Base)\n• R2: Hold for 2nd Tier (Right Trigger: Also switches to 2nd page while held)\n• L2: Shift (Left Trigger: HOLD for uppercase letters / secondary symbols)"
-                android:textColor="#C0CAF5"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <!-- Left Stick Modifier Joystick -->
@@ -732,7 +785,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="LEFT STICK (MODIFIER JOYSTICK)"
-                android:textColor="#7AA2F7"
+                android:textColor="@color/accent_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -742,7 +795,7 @@
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
                 android:text="• Tilt Right: SUPER / WIN (Hold for Win+D, Win+E, Win+R, Win+Tab, Win+Arrows)\n• Tilt Down: CTRL (Hold for Ctrl+C, Ctrl+V, Ctrl+Z, Ctrl+A...)\n• Tilt Left: ALT (Hold for Alt+key, Alt+Tab, Alt+F4...)\n• Tilt Up: SHIFT (or Left Trigger L2)\n• Diagonals: Down-Right = Win+Ctrl, Up-Right = Win+Shift, Down-Left = Ctrl+Alt\n• Flick Right &amp; Release: Tap standalone Super (Windows) Key to open Start/Launcher!\n• L3 Click: Caps Lock Toggle (Lights up [CAPS])"
-                android:textColor="#C0CAF5"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <!-- D-Pad -->
@@ -751,7 +804,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="D-PAD &amp; CURSOR NAVIGATION"
-                android:textColor="#7AA2F7"
+                android:textColor="@color/accent_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -761,7 +814,7 @@
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
                 android:text="• ← (Left): Move cursor left (Super+Left to Snap left)\n• → (Right): Move cursor right (Super+Right to Snap right)\n• ↑ (Up): Move cursor up\n• ↓ (Down): Move cursor down"
-                android:textColor="#C0CAF5"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
             <!-- Right Stick & System -->
@@ -770,7 +823,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="RIGHT STICK &amp; SYSTEM BUTTONS"
-                android:textColor="#7AA2F7"
+                android:textColor="@color/accent_primary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -780,9 +833,13 @@
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
                 android:text="• Right Stick: Aim radial sectors (or move mouse cursor when holding R2)\n• Hold R2: Mouse Layer (Right Stick = Move Cursor, D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select &amp; Start: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)"
-                android:textColor="#C0CAF5"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
 
     </LinearLayout>
 </ScrollView>

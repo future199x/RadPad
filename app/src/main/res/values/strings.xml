@@ -8,4 +8,147 @@
     <string name="hud_mods_prefix">Modifiers: </string>
     <string name="accessibility_service_label">RadPad Virtual Mouse Click Service</string>
     <string name="accessibility_service_description">Enables RadPad to dispatch system-wide mouse clicks when holding R2.</string>
+
+    <!-- IME Cheatsheets -->
+    <string name="ime_cheatsheet1">R1: Select / Type | Center R1: 2nd Page | L1: Back</string>
+    <string name="ime_cheatsheet2">A: Space | X: Backspace | Y: Enter | B: Tab</string>
+
+    <!-- Virtual Mouse HUD Status -->
+    <string name="hud_mouse_left_click">Mouse: Left Click</string>
+    <string name="hud_mouse_right_click">Mouse: Right Click</string>
+    <string name="hud_mouse_middle_click">Mouse: Middle Click</string>
+    <string name="hud_mouse_layer_status">MOUSE LAYER (Aim Stick: Move | D-Pad: Clicks)</string>
+    <string name="hud_mouse_dpad_help">D-Pad: ← Left Click | → Right Click | ↑ Mid Click</string>
+    <string name="live_mouse_left_click">Mouse: Left Click</string>
+    <string name="live_mouse_right_click">Mouse: Right Click</string>
+    <string name="live_mouse_middle_click">Mouse: Middle Click</string>
+
+    <!-- Cursor Navigation -->
+    <string name="hud_cursor_status">Cursor: %1$s</string>
+    <string name="dpad_left">← Left</string>
+    <string name="dpad_right">→ Right</string>
+    <string name="dpad_up">↑ Up</string>
+    <string name="dpad_down">↓ Down</string>
+
+    <!-- Action & Emitted Strings -->
+    <string name="hud_emitted_format">Emitted: \'%1$s\'</string>
+    <string name="action_backspace">BACKSPACE</string>
+    <string name="action_del_forward">DEL (Forward)</string>
+    <string name="action_space">SPACE</string>
+    <string name="action_enter">\\n</string>
+    <string name="action_tab">\\t</string>
+    <string name="action_super">WIN (Super)</string>
+
+    <!-- Overlay Status -->
+    <string name="hud_overlay_visible">Overlay: Visible</string>
+    <string name="hud_overlay_hidden">Overlay: Hidden</string>
+
+    <!-- HUD Layers -->
+    <string name="layer_mouse">MOUSE LAYER</string>
+    <string name="layer_base">BASE LAYER</string>
+    <string name="layer_sym_1">SYM 1</string>
+    <string name="layer_sym_2">SYM 2</string>
+    <string name="layer_num_1">NUM (1-8)</string>
+    <string name="layer_num_2">NUM (9-0)</string>
+    <string name="layer_fn_1">FN (1-8)</string>
+    <string name="layer_fn_2">FN (9-12)</string>
+    <string name="layer_qz_1">Q-Z (Q-X)</string>
+    <string name="layer_qz_2">Q-Z (Y-Z)</string>
+    <string name="layer_macros">MACROS</string>
+
+    <!-- Modifiers & Macros -->
+    <string name="hud_mods_none">MODS: NONE</string>
+    <string name="hud_mods_format">MODS: %1$s</string>
+    <string name="hud_macro_format">MACRO: %1$s</string>
+
+    <!-- Floating HUD Overlay Titles and Modes -->
+    <string name="floating_title_mouse_mode">⠿ MOUSE MODE</string>
+    <string name="floating_title_radpad">⠿ RADPAD</string>
+    <string name="mode_base">BASE</string>
+    <string name="mode_sym_1">SYM 1</string>
+    <string name="mode_sym_2">SYM 2</string>
+    <string name="mode_num_1">1-8</string>
+    <string name="mode_num_2">9-0</string>
+    <string name="mode_fn_1">FN 1-8</string>
+    <string name="mode_fn_2">FN 9-12</string>
+    <string name="mode_qz_1">Q-X</string>
+    <string name="mode_qz_2">Y-Z</string>
+    <string name="mode_macro">MACRO</string>
+
+    <!-- Accordion Chevrons -->
+    <string name="chevron_down">▼</string>
+    <string name="chevron_up">▲</string>
+
+    <!-- MainActivity Actions & Spinners -->
+    <string name="action_name_toggle_hud">Toggle HUD</string>
+    <string name="action_name_hide_keyboard">Hide Keyboard</string>
+    <string name="action_name_toggle_hud_hide_keyboard">Toggle HUD + Hide Keyboard</string>
+    <string name="action_hide_keyboard_desc">%1$s Button -> Action: Hide Keyboard</string>
+    <string name="action_toggle_hud_hide_desc">%1$s Button -> Action: Toggle HUD + Hide Keyboard</string>
+    <string name="action_toggle_hud_desc">%1$s Button -> Action: Toggle HUD</string>
+
+    <!-- Floating HUD Toggle Button -->
+    <string name="btn_close_floating_hud">✕ Close Always-On Floating HUD</string>
+    <string name="btn_launch_floating_hud">📌 Launch Always-On Floating HUD</string>
+
+    <!-- Accessibility Status & Button -->
+    <string name="accessibility_status_enabled">✓ System Clicks: Enabled</string>
+    <string name="accessibility_status_disabled">⚠️ System Clicks: Disabled</string>
+    <string name="btn_clicks_configured">Configured</string>
+    <string name="btn_clicks_enable">Enable Clicks</string>
+
+    <!-- Controller Status Telemetry -->
+    <string name="status_gamepad_ready">🎮 Gamepad Ready: %1$s</string>
+    <string name="detail_gamepad_ready">Aim Right Stick. Press R1 to Select. L1 returns to Base. Hold R2 for 2nd tier.</string>
+    <string name="status_no_gamepad">⚠️ No Gamepad Detected in Android</string>
+    <string name="detail_android_sees">Android sees: %1$s</string>
+    <string name="status_dpad_nav">🎮 D-Pad Navigation: %1$s</string>
+    <string name="live_dpad_nav">D-Pad: %1$s</string>
+    <string name="status_mouse_layer_active">Mouse Layer Active (Right Stick: Move | D-Pad: Click)</string>
+    <string name="live_mouse_cursor_format">Mouse Cursor: (%1$.0f, %2$.0f) | Stick: (%3$+.2f, %4$+.2f)</string>
+    <string name="status_controller_signal_layer">🎮 Controller Signal: Layer [%1$s]</string>
+    <string name="status_left_stick_flick">🎮 Left Stick Flick: Windows / Super Key Emitted!</string>
+    <string name="live_left_stick_flick">Left Stick Flick: Emitted Standalone WIN (Super)</string>
+    <string name="live_telemetry_format">L-Stick: (%1$+.2f, %2$+.2f) | R-Stick: (%3$+.2f, %4$+.2f) | Mods: %5$s | L2: %6$.2f R2: %7$.2f</string>
+    <string name="status_controller_signal_detected">🎮 Controller Signal Detected: %1$s</string>
+
+    <!-- Live Input Button Messages -->
+    <string name="live_r1_select">R1 Select: %1$s</string>
+    <string name="live_selected_layer">Selected Layer: %1$s</string>
+    <string name="live_l1_back">L1 Back: Layer [%1$s]</string>
+    <string name="live_mouse_layer_activated">Mouse Layer Activated</string>
+    <string name="live_mouse_layer_deactivated">Mouse Layer Deactivated</string>
+    <string name="live_square_del">Square [DEL (Forward)]</string>
+    <string name="live_square_backspace">Square [BACKSPACE]</string>
+    <string name="live_cross_space">Cross (A) [SPACE]</string>
+    <string name="live_triangle_enter">Triangle (Y) [ENTER]</string>
+    <string name="live_circle_tab">Circle (B) [TAB]</string>
+    <string name="btn_r1_select">R1 [SELECT]</string>
+    <string name="btn_l1_base">L1 [BASE LAYER]</string>
+    <string name="btn_cross_space">Cross [SPACE]</string>
+    <string name="btn_triangle_enter">Triangle [ENTER]</string>
+    <string name="btn_circle_tab">Circle [TAB]</string>
+    <string name="layer_second_suffix">%1$s (2nd)</string>
+
+    <!-- Custom Macro Dialog Strings -->
+    <string name="macro_dialog_title">Slot %1$d: %2$s</string>
+    <string name="macro_slot_fallback">Slot %1$d</string>
+    <string name="macro_info_text">Enter key combo (e.g. ctrl+shift+z, win+shift+s, alt+tab) or text (e.g. text:hello):</string>
+    <string name="macro_combo_hint">Key combo (e.g. ctrl+shift+z)</string>
+    <string name="macro_label_hint">Short HUD Label (e.g. REDO, max 6 chars)</string>
+    <string name="macro_status_validating">Validating…</string>
+    <string name="macro_status_valid">✓ %1$s</string>
+    <string name="macro_status_invalid">✗ %1$s</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="macro_custom_option_format">✏️ %1$s [%2$s]</string>
+    <string name="macro_custom_option_default">✏️ Custom / Key Combo…</string>
+    <string name="macro_dir_north">North (0°)</string>
+    <string name="macro_dir_northeast">NorthEast (45°)</string>
+    <string name="macro_dir_east">East (90°)</string>
+    <string name="macro_dir_southeast">SouthEast (135°)</string>
+    <string name="macro_dir_south">South (180°)</string>
+    <string name="macro_dir_southwest">SouthWest (225°)</string>
+    <string name="macro_dir_west">West (270°)</string>
+    <string name="macro_dir_northwest">NorthWest (315°)</string>
 </resources>

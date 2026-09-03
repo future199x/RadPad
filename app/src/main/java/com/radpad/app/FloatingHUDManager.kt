@@ -1,14 +1,34 @@
 package com.radpad.app
 
 import java.util.concurrent.CopyOnWriteArrayList
+import androidx.core.net.toUri
 
 /**
- * FloatingHUDManager: Shared communication hub linking ControllerIME, MainActivity,
- * and the always-on FloatingHUDService.
+ * Shared communication hub and observer coordinator linking [ControllerIME], [MainActivity],
+ * and the background [FloatingHUDService].
+ *
+ * Maintains the latest controller stick telemetry, active layer tier, and modifier bitmask state,
+ * broadcasting changes thread-safely across all registered [Listener] instances via [CopyOnWriteArrayList].
  */
 object FloatingHUDManager {
 
+    /**
+     * Callback interface for receiving real-time input telemetry and layer updates.
+     */
     interface Listener {
+        /**
+         * Invoked whenever the controller stick moves or modifier/layer states transition.
+         *
+         * @param x Right stick X coordinate (-1.0f to 1.0f).
+         * @param y Right stick Y coordinate (-1.0f to 1.0f).
+         * @param layer The active [InputEngine.Layer].
+         * @param secondLayer Whether the secondary page of the layer is active.
+         * @param shift Whether Shift modifier is active.
+         * @param ctrl Whether Ctrl modifier is active.
+         * @param alt Whether Alt modifier is active.
+         * @param caps Whether Caps Lock is active.
+         * @param superKey Whether Super / Windows key is active.
+         */
         fun onStateUpdated(
             x: Float,
             y: Float,
@@ -20,10 +40,18 @@ object FloatingHUDManager {
             caps: Boolean,
             superKey: Boolean = false
         )
+
+        /**
+         * Invoked whenever the always-on floating HUD service starts or stops.
+         *
+         * @param isRunning True if [FloatingHUDService] is active, false if stopped.
+         */
+        fun onFloaterStateChanged(isRunning: Boolean) {}
     }
 
     private val listeners = CopyOnWriteArrayList<Listener>()
 
+    /** Active instance of [InputEngine] shared by the IME or setup activity. */
     var activeEngine: InputEngine? = null
 
     var lastX: Float = 0f
@@ -45,17 +73,38 @@ object FloatingHUDManager {
     var isSuper: Boolean = false
         private set
 
+    /**
+     * Registers a [Listener] and immediately sends the most recent known telemetry and floater states.
+     */
     fun register(listener: Listener) {
         if (!listeners.contains(listener)) {
             listeners.add(listener)
         }
         listener.onStateUpdated(lastX, lastY, lastLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
+        listener.onFloaterStateChanged(FloatingHUDService.isRunning)
     }
 
+    /**
+     * Unregisters a previously registered [Listener].
+     */
     fun unregister(listener: Listener) {
         listeners.remove(listener)
     }
 
+    /**
+     * Broadcasts floating overlay service running state changes to all registered listeners.
+     *
+     * @param running True if the overlay service is started, false if stopped.
+     */
+    fun notifyFloaterStateChanged(running: Boolean) {
+        for (listener in listeners) {
+            listener.onFloaterStateChanged(running)
+        }
+    }
+
+    /**
+     * Broadcasts updated stick coordinates and modifier/layer states to all active listeners.
+     */
     fun updateInput(
         x: Float,
         y: Float,
@@ -87,10 +136,10 @@ object FloatingHUDManager {
      * Returns true if overlay was started, false if stopped or permission needed.
      */
     fun toggleFloater(context: android.content.Context): Boolean {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(context)) {
+        if (!android.provider.Settings.canDrawOverlays(context)) {
             val intent = android.content.Intent(
                 android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:${context.packageName}")
+                "package:${context.packageName}".toUri()
             ).apply {
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             }

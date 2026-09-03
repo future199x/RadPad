@@ -1,11 +1,10 @@
 package com.radpad.app
 
+import android.annotation.SuppressLint
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -17,12 +16,20 @@ import android.view.WindowManager
 import android.widget.TextView
 
 /**
- * FloatingHUDService: System-wide, always-on-top draggable HUD overlay.
- * Renders the KinematicRadialHUDView persistently over any application.
+ * System-wide, always-on-top draggable HUD overlay service.
+ *
+ * Renders [KinematicRadialHUDView] persistently over any application window using Android's
+ * overlay window type ([WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY]).
+ *
+ * Synchronizes with [FloatingHUDManager] to display live gamepad telemetry, active layers,
+ * modifier statuses, and targeting feedback even when the soft keyboard is hidden.
  */
 class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.ThemeListener {
 
     companion object {
+        /**
+         * Global running flag indicating whether the floating HUD service is currently active.
+         */
         var isRunning: Boolean = false
             private set
     }
@@ -49,21 +56,42 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         return dp * resources.displayMetrics.density
     }
 
-    private fun createPillDrawable(bgColor: Int, cornerRadiusDp: Float = 4f): GradientDrawable {
+    private fun createPillDrawable(bgColor: Int): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dpToPx(cornerRadiusDp)
+            cornerRadius = dpToPx(4f)
             setColor(bgColor)
         }
     }
 
+    /**
+     * Updates a modifier indicator pill badge with active/inactive colors according to [isActive].
+     */
+    private fun applyBadgeState(
+        badge: TextView?,
+        isActive: Boolean,
+        activeText: Int,
+        activeBg: Int,
+        theme: ThemeManager.ColorScheme
+    ) {
+        if (isActive) {
+            badge?.setTextColor(activeText)
+            badge?.background = createPillDrawable(activeBg)
+        } else {
+            badge?.setTextColor(theme.badgeInactiveText)
+            badge?.background = createPillDrawable(theme.badgeInactiveBg)
+        }
+    }
+
+    @SuppressLint("InflateParams", "ClickableViewAccessibility")
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        FloatingHUDManager.notifyFloaterStateChanged(true)
 
         ThemeManager.init(this)
 
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val inflater = LayoutInflater.from(this)
         floatingView = inflater.inflate(R.layout.layout_floating_hud, null)
 
@@ -89,7 +117,7 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
 
         tvMode?.setOnClickListener {
             val current = FloatingHUDManager.lastLayer
-            val layers = InputEngine.Layer.values()
+            val layers = InputEngine.Layer.entries
             val nextLayer = layers[(current.ordinal + 1) % layers.size]
             FloatingHUDManager.activeEngine?.setLayer(nextLayer)
             FloatingHUDManager.updateInput(
@@ -105,12 +133,7 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             )
         }
 
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -132,6 +155,7 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             private var initialTouchX = 0f
             private var initialTouchY = 0f
 
+            @SuppressLint("ClickableViewAccessibility")
             override fun onTouch(v: View?, event: MotionEvent): Boolean {
                 val params = layoutParams ?: return false
                 when (event.action) {
@@ -148,6 +172,10 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                         try {
                             windowManager?.updateViewLayout(floatingView, params)
                         } catch (_: Exception) {}
+                        return true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v?.performClick()
                         return true
                     }
                 }
@@ -167,11 +195,14 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         FloatingHUDManager.register(this)
     }
 
+    /**
+     * Re-applies theme colors to the floating card container, title, badges, and radial HUD.
+     */
     override fun onThemeChanged(theme: ThemeManager.ColorScheme) {
         val updateAction = Runnable {
             val cardBg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(18f)
+                cornerRadius = dpToPx(20f)
                 setColor(theme.cardBackground)
                 setStroke(dpToPx(1.5f).toInt(), theme.ringStroke)
             }
@@ -193,6 +224,9 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         }
     }
 
+    /**
+     * Receives broadcasted input state updates from [FloatingHUDManager] and refreshes badges and dial.
+     */
     override fun onStateUpdated(
         x: Float,
         y: Float,
@@ -210,18 +244,18 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             val isMouse = VirtualMouseManager.isMouseLayerActive
             if (isMouse) {
                 tvMode?.visibility = View.GONE
-                tvTitle?.text = "🐭 MOUSE MODE"
+                tvTitle?.setText(R.string.floating_title_mouse_mode)
             } else {
                 tvMode?.visibility = View.VISIBLE
-                tvTitle?.text = "⠿ RADPAD"
+                tvTitle?.setText(R.string.floating_title_radpad)
 
                 val modeLabel = when (layer) {
-                    InputEngine.Layer.BASE -> "BASE"
-                    InputEngine.Layer.MORE_SYM -> if (secondLayer) "SYM 2" else "SYM 1"
-                    InputEngine.Layer.NUM_SYM -> if (secondLayer) "9-0" else "1-8"
-                    InputEngine.Layer.FN -> if (secondLayer) "FN 9-12" else "FN 1-8"
-                    InputEngine.Layer.Q_Z -> if (secondLayer) "Y-Z" else "Q-X"
-                    InputEngine.Layer.MACRO -> "MACRO"
+                    InputEngine.Layer.BASE -> getString(R.string.mode_base)
+                    InputEngine.Layer.MORE_SYM -> if (secondLayer) getString(R.string.mode_sym_2) else getString(R.string.mode_sym_1)
+                    InputEngine.Layer.NUM_SYM -> if (secondLayer) getString(R.string.mode_num_2) else getString(R.string.mode_num_1)
+                    InputEngine.Layer.FN -> if (secondLayer) getString(R.string.mode_fn_2) else getString(R.string.mode_fn_1)
+                    InputEngine.Layer.Q_Z -> if (secondLayer) getString(R.string.mode_qz_2) else getString(R.string.mode_qz_1)
+                    InputEngine.Layer.MACRO -> getString(R.string.mode_macro)
                     else -> layer.displayName
                 }
                 val modeColor = when (layer) {
@@ -231,53 +265,15 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                 }
                 tvMode?.text = modeLabel
                 tvMode?.setTextColor(modeColor)
-                tvMode?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
+                tvMode?.background = createPillDrawable(theme.badgeInactiveBg)
             }
 
-            // Caps badge
-            if (caps) {
-                badgeCaps?.setTextColor(theme.badgeActiveCapsText)
-                badgeCaps?.background = createPillDrawable(theme.badgeActiveCapsBg, 4f)
-            } else {
-                badgeCaps?.setTextColor(theme.badgeInactiveText)
-                badgeCaps?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
-            }
-
-            // Shift badge
-            if (shift) {
-                badgeShift?.setTextColor(theme.badgeActiveShiftText)
-                badgeShift?.background = createPillDrawable(theme.badgeActiveShiftBg, 4f)
-            } else {
-                badgeShift?.setTextColor(theme.badgeInactiveText)
-                badgeShift?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
-            }
-
-            // Ctrl badge
-            if (ctrl) {
-                badgeCtrl?.setTextColor(theme.badgeActiveCtrlText)
-                badgeCtrl?.background = createPillDrawable(theme.badgeActiveCtrlBg, 4f)
-            } else {
-                badgeCtrl?.setTextColor(theme.badgeInactiveText)
-                badgeCtrl?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
-            }
-
-            // Alt badge
-            if (alt) {
-                badgeAlt?.setTextColor(theme.badgeActiveAltText)
-                badgeAlt?.background = createPillDrawable(theme.badgeActiveAltBg, 4f)
-            } else {
-                badgeAlt?.setTextColor(theme.badgeInactiveText)
-                badgeAlt?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
-            }
-
-            // Super / Win badge
-            if (superKey) {
-                badgeSuper?.setTextColor(theme.badgeActiveSuperText)
-                badgeSuper?.background = createPillDrawable(theme.badgeActiveSuperBg, 4f)
-            } else {
-                badgeSuper?.setTextColor(theme.badgeInactiveText)
-                badgeSuper?.background = createPillDrawable(theme.badgeInactiveBg, 4f)
-            }
+            // Update modifier badges via helper
+            applyBadgeState(badgeCaps, caps, theme.badgeActiveCapsText, theme.badgeActiveCapsBg, theme)
+            applyBadgeState(badgeShift, shift, theme.badgeActiveShiftText, theme.badgeActiveShiftBg, theme)
+            applyBadgeState(badgeCtrl, ctrl, theme.badgeActiveCtrlText, theme.badgeActiveCtrlBg, theme)
+            applyBadgeState(badgeAlt, alt, theme.badgeActiveAltText, theme.badgeActiveAltBg, theme)
+            applyBadgeState(badgeSuper, superKey, theme.badgeActiveSuperText, theme.badgeActiveSuperBg, theme)
 
             radialHUD?.updateState(x, y, layer, secondLayer, shift, ctrl, alt, caps, superKey)
         }
@@ -294,10 +290,10 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             mainHandler.post {
                 if (active) {
                     tvMode?.visibility = View.GONE
-                    tvTitle?.text = "🐭 MOUSE MODE"
+                    tvTitle?.setText(R.string.floating_title_mouse_mode)
                 } else {
                     tvMode?.visibility = View.VISIBLE
-                    tvTitle?.text = "⠿ RADPAD"
+                    tvTitle?.setText(R.string.floating_title_radpad)
                 }
                 radialHUD?.invalidate()
             }
@@ -306,9 +302,13 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         override fun onMouseClicked(button: VirtualMouseManager.MouseButton, x: Float, y: Float) {}
     }
 
+    /**
+     * Cleans up floating view from WindowManager, unregisters listeners, and resets running status.
+     */
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        FloatingHUDManager.notifyFloaterStateChanged(false)
         VirtualMouseManager.unregister(mouseListener)
         FloatingHUDManager.unregister(this)
         ThemeManager.unregister(this)

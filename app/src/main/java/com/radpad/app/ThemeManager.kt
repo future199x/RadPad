@@ -2,16 +2,25 @@ package com.radpad.app
 
 import android.content.Context
 import java.util.concurrent.CopyOnWriteArrayList
+import androidx.core.content.edit
 
 /**
- * ThemeManager: Central color scheme coordinator supporting:
- * - Tokyo Night (Default cyberpunk blue/purple)
- * - Gruvbox (Retro warm groove)
- * - Dracula (Gothic purple/pink/cyan)
- * - Black & White / Monochrome (High-contrast OLED black & white)
+ * Central theme and color scheme coordinator.
+ *
+ * Supports four distinct developer/gaming aesthetics:
+ * - **Gruvbox**: Default warm retro groovbox brown, orange, and gold tones.
+ * - **Tokyo Night**: Cyberpunk dark blue, purple, and cyan palette.
+ * - **Dracula**: Gothic high-contrast dark slate, purple, and pastel pink.
+ * - **Monochrome**: High-contrast OLED pure black & white.
+ *
+ * Persists the user's active theme in [android.content.SharedPreferences] and notifies
+ * registered [ThemeListener] components ([MainActivity], [ControllerIME], [FloatingHUDService]).
  */
 object ThemeManager {
 
+    /**
+     * Color palette definitions containing pre-computed ARGB color integers for HUD elements.
+     */
     enum class ColorScheme(
         val key: String,
         val displayName: String,
@@ -45,40 +54,6 @@ object ThemeManager {
         val badgeInactiveText: Int,
         val badgeInactiveBg: Int
     ) {
-        TOKYO_NIGHT(
-            key = "tokyonight",
-            displayName = "Tokyo Night",
-            dialBackground = 0xFF1A1B26.toInt(),
-            deadzoneBackground = 0xFF16161E.toInt(),
-            ringStroke = 0xFF353B55.toInt(),
-            sliceDivider = 0xFF282C40.toInt(),
-            activeSliceFill = 0x550084FF.toInt(),
-            activeSliceStroke = 0xFF00C8FF.toInt(),
-            inactiveText = 0xFFBAC2DE.toInt(),
-            activeText = 0xFFFFFFFF.toInt(),
-            centerInfoText = 0xFF7AA2F7.toInt(),
-            reticleDot = 0xFF00F0FF.toInt(),
-            reticleRing = 0xAA00F0FF.toInt(),
-            cardBackground = 0xF21A1B26.toInt(),
-            headerText = 0xFF7AA2F7.toInt(),
-            closeButtonColor = 0xFFF7768E.toInt(),
-            modeAbcColor = 0xFFA6E3A1.toInt(),
-            mode123Color = 0xFFF9E2AF.toInt(),
-            modeFnColor = 0xFFFF9E3B.toInt(),
-            badgeActiveCapsText = 0xFFBB9AF7.toInt(),
-            badgeActiveCapsBg = 0xFF3B284C.toInt(),
-            badgeActiveShiftText = 0xFF7DCFFF.toInt(),
-            badgeActiveShiftBg = 0xFF1E3A52.toInt(),
-            badgeActiveCtrlText = 0xFF7AA2F7.toInt(),
-            badgeActiveCtrlBg = 0xFF1E2852.toInt(),
-            badgeActiveAltText = 0xFFE0AF68.toInt(),
-            badgeActiveAltBg = 0xFF423318.toInt(),
-            badgeActiveSuperText = 0xFF7DCFFF.toInt(),
-            badgeActiveSuperBg = 0xFF1E3A52.toInt(),
-            badgeInactiveText = 0xFF565F89.toInt(),
-            badgeInactiveBg = 0xFF24283B.toInt()
-        ),
-
         GRUVBOX(
             key = "gruvbox",
             displayName = "Gruvbox",
@@ -86,7 +61,7 @@ object ThemeManager {
             deadzoneBackground = 0xFF1D2021.toInt(),
             ringStroke = 0xFF504945.toInt(),
             sliceDivider = 0xFF3C3836.toInt(),
-            activeSliceFill = 0x55FE8019.toInt(),
+            activeSliceFill = 0x55FE8019,
             activeSliceStroke = 0xFFFABD2F.toInt(),
             inactiveText = 0xFFEBDBB2.toInt(),
             activeText = 0xFFFBF1C7.toInt(),
@@ -107,10 +82,44 @@ object ThemeManager {
             badgeActiveCtrlBg = 0xFF22353B.toInt(),
             badgeActiveAltText = 0xFFFABD2F.toInt(),
             badgeActiveAltBg = 0xFF4D3D18.toInt(),
-            badgeActiveSuperText = 0xFF8EC07C.toInt(),
-            badgeActiveSuperBg = 0xFF283B2E.toInt(),
+            badgeActiveSuperText = 0xFFFE8019.toInt(),
+            badgeActiveSuperBg = 0xFF4D2C17.toInt(),
             badgeInactiveText = 0xFF928374.toInt(),
             badgeInactiveBg = 0xFF32302F.toInt()
+        ),
+
+        TOKYO_NIGHT(
+            key = "tokyonight",
+            displayName = "Tokyo Night",
+            dialBackground = 0xFF1A1B26.toInt(),
+            deadzoneBackground = 0xFF16161E.toInt(),
+            ringStroke = 0xFF353B55.toInt(),
+            sliceDivider = 0xFF282C40.toInt(),
+            activeSliceFill = 0x550084FF,
+            activeSliceStroke = 0xFF00C8FF.toInt(),
+            inactiveText = 0xFFBAC2DE.toInt(),
+            activeText = 0xFFFFFFFF.toInt(),
+            centerInfoText = 0xFF7AA2F7.toInt(),
+            reticleDot = 0xFF00F0FF.toInt(),
+            reticleRing = 0xAA00F0FF.toInt(),
+            cardBackground = 0xF21A1B26.toInt(),
+            headerText = 0xFF7AA2F7.toInt(),
+            closeButtonColor = 0xFFF7768E.toInt(),
+            modeAbcColor = 0xFFA6E3A1.toInt(),
+            mode123Color = 0xFFF9E2AF.toInt(),
+            modeFnColor = 0xFFFF9E3B.toInt(),
+            badgeActiveCapsText = 0xFFBB9AF7.toInt(),
+            badgeActiveCapsBg = 0xFF3B284C.toInt(),
+            badgeActiveShiftText = 0xFF7DCFFF.toInt(),
+            badgeActiveShiftBg = 0xFF1E3A52.toInt(),
+            badgeActiveCtrlText = 0xFF7AA2F7.toInt(),
+            badgeActiveCtrlBg = 0xFF1E2852.toInt(),
+            badgeActiveAltText = 0xFFE0AF68.toInt(),
+            badgeActiveAltBg = 0xFF423318.toInt(),
+            badgeActiveSuperText = 0xFF9ECE6A.toInt(),
+            badgeActiveSuperBg = 0xFF1F3825.toInt(),
+            badgeInactiveText = 0xFF565F89.toInt(),
+            badgeInactiveBg = 0xFF24283B.toInt()
         ),
 
         DRACULA(
@@ -120,7 +129,7 @@ object ThemeManager {
             deadzoneBackground = 0xFF21222C.toInt(),
             ringStroke = 0xFF6272A4.toInt(),
             sliceDivider = 0xFF44475A.toInt(),
-            activeSliceFill = 0x55BD93F9.toInt(),
+            activeSliceFill = 0x55BD93F9,
             activeSliceStroke = 0xFFFF79C6.toInt(),
             inactiveText = 0xFFF8F8F2.toInt(),
             activeText = 0xFFFFFFFF.toInt(),
@@ -141,8 +150,8 @@ object ThemeManager {
             badgeActiveCtrlBg = 0xFF35204C.toInt(),
             badgeActiveAltText = 0xFFF1FA8C.toInt(),
             badgeActiveAltBg = 0xFF45421A.toInt(),
-            badgeActiveSuperText = 0xFFBD93F9.toInt(),
-            badgeActiveSuperBg = 0xFF35204C.toInt(),
+            badgeActiveSuperText = 0xFF50FA7B.toInt(),
+            badgeActiveSuperBg = 0xFF1A3D24.toInt(),
             badgeInactiveText = 0xFF6272A4.toInt(),
             badgeInactiveBg = 0xFF343746.toInt()
         ),
@@ -154,7 +163,7 @@ object ThemeManager {
             deadzoneBackground = 0xFF0A0A0A.toInt(),
             ringStroke = 0xFF444444.toInt(),
             sliceDivider = 0xFF222222.toInt(),
-            activeSliceFill = 0x55FFFFFF.toInt(),
+            activeSliceFill = 0x55FFFFFF,
             activeSliceStroke = 0xFFFFFFFF.toInt(),
             inactiveText = 0xFF9E9E9E.toInt(),
             activeText = 0xFFFFFFFF.toInt(),
@@ -183,37 +192,54 @@ object ThemeManager {
 
         companion object {
             fun fromKey(key: String?): ColorScheme {
-                return values().firstOrNull { it.key.equals(key, ignoreCase = true) } ?: TOKYO_NIGHT
+                return entries.firstOrNull { it.key.equals(key, ignoreCase = true) } ?: GRUVBOX
             }
         }
     }
 
+    /**
+     * Observer interface for components that react to color palette changes.
+     */
     interface ThemeListener {
+        /**
+         * Invoked whenever a new [theme] is activated by the user.
+         */
         fun onThemeChanged(theme: ColorScheme)
     }
 
     private val listeners = CopyOnWriteArrayList<ThemeListener>()
-    var currentTheme: ColorScheme = ColorScheme.TOKYO_NIGHT
+
+    /** Active color scheme across all UI components. */
+    var currentTheme: ColorScheme = ColorScheme.GRUVBOX
         private set
 
+    /**
+     * Initializes the manager, reading the user's saved theme from SharedPreferences.
+     */
     fun init(context: Context) {
         val prefs = context.getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-        val savedKey = prefs.getString("color_scheme", ColorScheme.TOKYO_NIGHT.key)
+        val savedKey = prefs.getString("color_scheme", ColorScheme.GRUVBOX.key)
         currentTheme = ColorScheme.fromKey(savedKey)
     }
 
+    /**
+     * Activates [theme], saves it to SharedPreferences, and alerts all registered listeners.
+     */
     fun setTheme(context: Context, theme: ColorScheme) {
         currentTheme = theme
         context.getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .putString("color_scheme", theme.key)
-            .apply()
+            .edit {
+                putString("color_scheme", theme.key)
+            }
 
         for (l in listeners) {
             l.onThemeChanged(theme)
         }
     }
 
+    /**
+     * Registers a [listener] and immediately dispatches the current theme to it.
+     */
     fun register(listener: ThemeListener) {
         if (!listeners.contains(listener)) {
             listeners.add(listener)
@@ -221,6 +247,9 @@ object ThemeManager {
         listener.onThemeChanged(currentTheme)
     }
 
+    /**
+     * Unregisters a previously registered [listener].
+     */
     fun unregister(listener: ThemeListener) {
         listeners.remove(listener)
     }

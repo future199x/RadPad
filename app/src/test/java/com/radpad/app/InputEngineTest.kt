@@ -243,4 +243,110 @@ class InputEngineTest {
         engine.goBackLayer()
         assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
     }
+
+    @Test
+    fun testLeftStickModifiersTiltDirections() {
+        val engine = InputEngine()
+
+        // 1. Tilt UP (ly = -0.8f): SHIFT
+        engine.onLeftStickMotion(0f, -0.8f)
+        assertTrue(engine.isLeftStickShiftActive)
+        assertTrue(engine.isShiftActive)
+        assertFalse(engine.isCtrlActive)
+        assertFalse(engine.isAltActive)
+        assertFalse(engine.isSuperActive)
+
+        // Return to center: SHIFT released
+        engine.onLeftStickMotion(0f, 0f)
+        assertFalse(engine.isLeftStickShiftActive)
+        assertFalse(engine.isShiftActive)
+
+        // 2. Tilt DOWN (ly = +0.8f): CTRL
+        engine.onLeftStickMotion(0f, 0.8f)
+        assertTrue(engine.isLeftStickCtrlActive)
+        assertTrue(engine.isCtrlActive)
+        assertFalse(engine.isShiftActive)
+
+        // Return to center
+        engine.onLeftStickMotion(0f, 0f)
+        assertFalse(engine.isLeftStickCtrlActive)
+        assertFalse(engine.isCtrlActive)
+
+        // 3. Tilt LEFT (lx = -0.8f): ALT
+        engine.onLeftStickMotion(-0.8f, 0f)
+        assertTrue(engine.isLeftStickAltActive)
+        assertTrue(engine.isAltActive)
+        assertFalse(engine.isCtrlActive)
+
+        // Return to center
+        engine.onLeftStickMotion(0f, 0f)
+        assertFalse(engine.isLeftStickAltActive)
+        assertFalse(engine.isAltActive)
+
+        // 4. Tilt RIGHT (lx = +0.8f): SUPER
+        engine.onLeftStickMotion(0.8f, 0f)
+        assertTrue(engine.isLeftStickSuperActive)
+        assertTrue(engine.isSuperActive)
+        assertFalse(engine.isAltActive)
+
+        // Return to center
+        val event = engine.onLeftStickMotion(0f, 0f)
+        assertFalse(engine.isLeftStickSuperActive)
+        assertFalse(engine.isSuperActive)
+        assertNotNull(event)
+        assertEquals(InputEngine.KEY_SUPER, event!!.charCode)
+        assertTrue(event.isSuper)
+    }
+
+    @Test
+    fun testLeftStickStandaloneSuperAfterTyping() {
+        val engine = InputEngine()
+
+        // Simulate typing a character with onSelect
+        engine.setLayer(InputEngine.Layer.A_H)
+        engine.onMotion(0f, -0.8f) // North = A
+        val typedEvent = engine.onSelect()
+        assertNotNull(typedEvent)
+
+        // Now user flicks left stick to the right (lx = 0.8f)
+        val duringFlick = engine.onLeftStickMotion(0.8f, 0f)
+        assertNull(duringFlick)
+        assertTrue(engine.isLeftStickSuperActive)
+
+        // User releases stick to center (lx = 0f, ly = 0f)
+        val releaseEvent = engine.onLeftStickMotion(0f, 0f)
+        assertNotNull(releaseEvent)
+        assertEquals(InputEngine.KEY_SUPER, releaseEvent!!.charCode)
+        assertTrue(releaseEvent.isSuper)
+    }
+
+    @Test
+    fun testLeftStickSuperHoldingWhileTypingDoesNotEmitStandaloneSuper() {
+        val engine = InputEngine()
+
+        // Tilt right: Super is held for Win+key combo
+        engine.onLeftStickMotion(0.8f, 0f)
+        assertTrue(engine.isLeftStickSuperActive)
+
+        // User types something while Super is held
+        engine.onSelect()
+
+        // Release stick
+        val releaseEvent = engine.onLeftStickMotion(0f, 0f)
+        // Since user typed while Super was held, no standalone Super key should fire
+        assertNull(releaseEvent)
+    }
+
+    @Test
+    fun testBackToBaseLayer() {
+        val engine = InputEngine()
+        engine.setLayer(InputEngine.Layer.MORE_SYM)
+        engine.toggleSecondLayer()
+        assertTrue(engine.isSecondLayerActive)
+        assertEquals(InputEngine.Layer.MORE_SYM, engine.currentLayer)
+
+        engine.backToBaseLayer()
+        assertEquals(InputEngine.Layer.BASE, engine.currentLayer)
+        assertFalse(engine.isSecondLayerActive)
+    }
 }

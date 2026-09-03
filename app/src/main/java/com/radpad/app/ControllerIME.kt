@@ -1,25 +1,26 @@
 package com.radpad.app
 
-import android.content.ClipboardManager
-import android.content.Context
+import android.annotation.SuppressLint
 import android.inputmethodservice.InputMethodService
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.widget.TextView
 
 /**
- * RadPad: High-performance gamepad InputMethodService for ultra-fast,
+ * RadPad: High-performance gamepad [InputMethodService] providing ultra-low latency,
  * system-wide controller typing.
  *
- * Responsibilities:
- * 1. Intercepts hardware gamepad analog stick (MotionEvent) and button inputs (KeyEvent).
- * 2. Radial aiming via Right Stick; selection via Right Bumper (R1).
- * 3. Base Layer return via Left Bumper (L1); secondary layer hold via Right Trigger (R2).
- * 4. Injects emitted characters and modifier sequences into the OS via `currentInputConnection`.
- * 5. Displays real-time radial HUD showing base layer preview text, active layers, and targeting reticle.
+ * ## Responsibilities
+ * 1. **Input Interception**: Intercepts gamepad analog stick motions ([MotionEvent]) and button presses ([KeyEvent]).
+ * 2. **Radial Navigation**: Routes right-stick azimuths into [InputEngine] radial layers and handles selection via R1.
+ * 3. **Layer Management**: Dispatches layer depth traversal via L1 (Back to Base) and R2 (Mouse Layer / Secondary Hold).
+ * 4. **System Injection**: Emits resolved characters, control sequences, and meta-combinations via [InputConnection].
+ * 5. **Real-time HUD**: Renders real-time visual telemetry, layer preview, and aim reticle in [KinematicRadialHUDView].
  */
 class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
@@ -36,6 +37,8 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
     private var lastHatX: Float = 0f
     private var lastHatY: Float = 0f
 
+    private val prefs by lazy { getSharedPreferences("radpad_prefs", MODE_PRIVATE) }
+
     override fun onCreate() {
         super.onCreate()
         window?.window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
@@ -45,6 +48,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         MacroManager.init(this)
     }
 
+    @SuppressLint("InflateParams")
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.ime_view, null)
         rootView = view
@@ -53,14 +57,12 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         hudZone = view.findViewById(R.id.tv_hud_zone)
         radialHUD = view.findViewById(R.id.radial_hud_view)
 
-        val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
         val isSymmetric = prefs.getBoolean("is_symmetric_slices", true)
         engine.setSymmetricSlices(isSymmetric)
         radialHUD?.isSymmetric = isSymmetric
 
-
-        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.text = "R1: Select / Type | Center R1: 2nd Page | L1: Back"
-        view.findViewById<TextView>(R.id.tv_ime_cheatsheet2)?.text = "A: Space | X: Backspace | Y: Enter | B: Tab"
+        view.findViewById<TextView>(R.id.tv_ime_cheatsheet1)?.setText(R.string.ime_cheatsheet1)
+        view.findViewById<TextView>(R.id.tv_ime_cheatsheet2)?.setText(R.string.ime_cheatsheet2)
 
         applyThemeToIME(ThemeManager.currentTheme)
 
@@ -77,13 +79,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         }
 
         // Read Right Stick (Radial Dial):
-        val rawZ = event.getAxisValue(MotionEvent.AXIS_Z)
-        val rawRZ = event.getAxisValue(MotionEvent.AXIS_RZ)
-        val rawRX = event.getAxisValue(MotionEvent.AXIS_RX)
-        val rawRY = event.getAxisValue(MotionEvent.AXIS_RY)
-        val rx = if (rawZ != 0f || rawRZ != 0f) rawZ else rawRX
-        val ry = if (rawZ != 0f || rawRZ != 0f) rawRZ else rawRY
-
+        val (rx, ry) = InputEngine.readRightStick(event)
         lastStickX = rx
         lastStickY = ry
 
@@ -107,10 +103,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             if (hatX != lastHatX) {
                 if (hatX < -0.5f) {
                     VirtualMouseManager.performLeftClick()
-                    hudStatus?.text = "Mouse: Left Click"
+                    hudStatus?.setText(R.string.hud_mouse_left_click)
                 } else if (hatX > 0.5f) {
                     VirtualMouseManager.performRightClick()
-                    hudStatus?.text = "Mouse: Right Click"
+                    hudStatus?.setText(R.string.hud_mouse_right_click)
                 }
                 lastHatX = hatX
             }
@@ -118,7 +114,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             if (hatY != lastHatY) {
                 if (hatY < -0.5f) {
                     VirtualMouseManager.performMiddleClick()
-                    hudStatus?.text = "Mouse: Middle Click"
+                    hudStatus?.setText(R.string.hud_mouse_middle_click)
                 }
                 lastHatY = hatY
             }
@@ -149,33 +145,38 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         return true
     }
 
+    /**
+     * Injects directional cursor motion key events via [InputConnection.sendKeyEvent]
+     * preserving all currently engaged modifier keys.
+     */
     private fun handleDpadNavigation(keyCode: Int) {
         val ic = currentInputConnection ?: return
         val mask = engine.currentButtonMask
-        var metaState = 0
-        if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-        if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-        if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
-        if ((mask and InputEngine.FLAG_SUPER) != 0) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
+        val metaState = buildMetaState(mask)
 
         ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
         ic.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, metaState))
-        val dirName = when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> "← Left"
-            KeyEvent.KEYCODE_DPAD_RIGHT -> "→ Right"
-            KeyEvent.KEYCODE_DPAD_UP -> "↑ Up"
-            KeyEvent.KEYCODE_DPAD_DOWN -> "↓ Down"
-            else -> ""
+        val dirRes = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> R.string.dpad_left
+            KeyEvent.KEYCODE_DPAD_RIGHT -> R.string.dpad_right
+            KeyEvent.KEYCODE_DPAD_UP -> R.string.dpad_up
+            KeyEvent.KEYCODE_DPAD_DOWN -> R.string.dpad_down
+            else -> null
         }
-        hudStatus?.text = "Cursor: $dirName"
+        val dirName = dirRes?.let { getString(it) }.orEmpty()
+        hudStatus?.text = getString(R.string.hud_cursor_status, dirName)
     }
 
+    /**
+     * Handles hardware button presses for layer selection (R1), layer back (L1),
+     * modifier holds, face button typing (A/B/X/Y), D-pad navigation, and system actions.
+     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // 0. Mouse Layer check:
         if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
             engine.onKeyEvent(keyCode, isDown = true)
             VirtualMouseManager.setMouseLayerActive(this, true)
-            hudStatus?.text = "🐭 MOUSE LAYER (Aim Stick: Move | D-Pad: Clicks)"
+            hudStatus?.setText(R.string.hud_mouse_layer_status)
             updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
             return true
         }
@@ -184,17 +185,17 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     VirtualMouseManager.performLeftClick()
-                    hudStatus?.text = "Mouse: Left Click"
+                    hudStatus?.setText(R.string.hud_mouse_left_click)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     VirtualMouseManager.performRightClick()
-                    hudStatus?.text = "Mouse: Right Click"
+                    hudStatus?.setText(R.string.hud_mouse_right_click)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     VirtualMouseManager.performMiddleClick()
-                    hudStatus?.text = "Mouse: Middle Click"
+                    hudStatus?.setText(R.string.hud_mouse_middle_click)
                     return true
                 }
             }
@@ -231,19 +232,11 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             KeyEvent.KEYCODE_BUTTON_X -> {
                 val mask = engine.currentButtonMask
                 val isShift = (mask and InputEngine.FLAG_SHIFT) != 0
-                val isCtrl = (mask and InputEngine.FLAG_CTRL) != 0
-                val isAlt = (mask and InputEngine.FLAG_ALT) != 0
-                val isSuper = (mask and InputEngine.FLAG_SUPER) != 0
-
                 val targetKeyCode = if (isShift) KeyEvent.KEYCODE_FORWARD_DEL else KeyEvent.KEYCODE_DEL
-                val actionName = if (isShift) "DEL (Forward)" else "BACKSPACE"
+                val actionNameRes = if (isShift) R.string.action_del_forward else R.string.action_backspace
 
-                if (isCtrl || isAlt || isSuper) {
-                    var metaState = 0
-                    if (isShift) metaState = metaState or KeyEvent.META_SHIFT_ON
-                    if (isCtrl) metaState = metaState or KeyEvent.META_CTRL_ON
-                    if (isAlt) metaState = metaState or KeyEvent.META_ALT_ON
-                    if (isSuper) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
+                if ((mask and (InputEngine.FLAG_CTRL or InputEngine.FLAG_ALT or InputEngine.FLAG_SUPER)) != 0) {
+                    val metaState = buildMetaState(mask)
                     currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, targetKeyCode, 0, metaState))
                     currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, targetKeyCode, 0, metaState))
                 } else if (isShift) {
@@ -257,65 +250,26 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                     }
                 }
-                hudStatus?.text = "Emitted: '$actionName'"
+                hudStatus?.text = getString(R.string.hud_emitted_format, getString(actionNameRes))
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
             }
 
             // Cross (KEYCODE_BUTTON_A): Space
             KeyEvent.KEYCODE_BUTTON_A -> {
-                val mask = engine.currentButtonMask
-                if ((mask and (InputEngine.FLAG_CTRL or InputEngine.FLAG_ALT or InputEngine.FLAG_SUPER)) != 0) {
-                    var metaState = 0
-                    if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-                    if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-                    if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
-                    if ((mask and InputEngine.FLAG_SUPER) != 0) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SPACE, 0, metaState))
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SPACE, 0, metaState))
-                } else {
-                    currentInputConnection?.commitText(" ", 1)
-                }
-                hudStatus?.text = "Emitted: 'SPACE'"
-                updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+                sendKeyOrCommit(KeyEvent.KEYCODE_SPACE, ' ', R.string.action_space)
                 return true
             }
 
             // Triangle (KEYCODE_BUTTON_Y): Enter / Newline
             KeyEvent.KEYCODE_BUTTON_Y -> {
-                val mask = engine.currentButtonMask
-                if ((mask and (InputEngine.FLAG_CTRL or InputEngine.FLAG_ALT or InputEngine.FLAG_SUPER)) != 0) {
-                    var metaState = 0
-                    if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-                    if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-                    if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
-                    if ((mask and InputEngine.FLAG_SUPER) != 0) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, metaState))
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, metaState))
-                } else {
-                    sendKeyChar('\n')
-                }
-                hudStatus?.text = "Emitted: '\\n'"
-                updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+                sendKeyOrCommit(KeyEvent.KEYCODE_ENTER, '\n', R.string.action_enter)
                 return true
             }
 
             // Circle (KEYCODE_BUTTON_B): Tab
             KeyEvent.KEYCODE_BUTTON_B -> {
-                val mask = engine.currentButtonMask
-                if ((mask and (InputEngine.FLAG_CTRL or InputEngine.FLAG_ALT or InputEngine.FLAG_SUPER)) != 0) {
-                    var metaState = 0
-                    if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-                    if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-                    if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
-                    if ((mask and InputEngine.FLAG_SUPER) != 0) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TAB, 0, metaState))
-                    currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TAB, 0, metaState))
-                } else {
-                    sendKeyChar('\t')
-                }
-                hudStatus?.text = "Emitted: '\\t'"
-                updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+                sendKeyOrCommit(KeyEvent.KEYCODE_TAB, '\t', R.string.action_tab)
                 return true
             }
 
@@ -346,20 +300,16 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             // Guide / Mode Button: Super
             KeyEvent.KEYCODE_BUTTON_MODE -> {
                 val mask = engine.currentButtonMask
-                var metaState = KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-                if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
-                if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
-                if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
+                val metaState = buildMetaState(mask) or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
                 currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_META_LEFT, 0, metaState))
                 currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_META_LEFT, 0, metaState))
-                hudStatus?.text = "Emitted: 'WIN (Super)'"
+                hudStatus?.text = getString(R.string.hud_emitted_format, getString(R.string.action_super))
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
             }
 
             // Share / Select Button
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
                 val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
                 executeSystemButtonAction(action)
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
@@ -368,7 +318,6 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
             // Options / Start: Close Keyboard / Toggle HUD
             KeyEvent.KEYCODE_BUTTON_START -> {
-                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
                 val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
                 executeSystemButtonAction(action)
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
@@ -379,6 +328,44 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         return super.onKeyDown(keyCode, event)
     }
 
+    /**
+     * Builds an Android [KeyEvent] metaState bitmask from active [InputEngine] modifier flags.
+     */
+    private fun buildMetaState(mask: Int): Int {
+        var metaState = 0
+        if ((mask and InputEngine.FLAG_SHIFT) != 0) metaState = metaState or KeyEvent.META_SHIFT_ON
+        if ((mask and InputEngine.FLAG_CTRL) != 0) metaState = metaState or KeyEvent.META_CTRL_ON
+        if ((mask and InputEngine.FLAG_ALT) != 0) metaState = metaState or KeyEvent.META_ALT_ON
+        if ((mask and InputEngine.FLAG_SUPER) != 0) metaState = metaState or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
+        return metaState
+    }
+
+    /**
+     * Dispatches a key event with metaState if modifier flags are held, or commits text / sends key char otherwise.
+     */
+    private fun sendKeyOrCommit(keyCode: Int, plainChar: Char?, actionNameRes: Int) {
+        val mask = engine.currentButtonMask
+        val hasModifiers = (mask and (InputEngine.FLAG_CTRL or InputEngine.FLAG_ALT or InputEngine.FLAG_SUPER)) != 0
+        if (hasModifiers) {
+            val metaState = buildMetaState(mask)
+            currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+            currentInputConnection?.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, keyCode, 0, metaState))
+        } else if (plainChar != null) {
+            if (plainChar == ' ') {
+                currentInputConnection?.commitText(" ", 1)
+            } else {
+                sendKeyChar(plainChar)
+            }
+        } else {
+            sendDownUpKeyEvents(keyCode)
+        }
+        hudStatus?.text = getString(R.string.hud_emitted_format, getString(actionNameRes))
+        updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+    }
+
+    /**
+     * Executes user-configured action for Select/Share or Start/Options buttons.
+     */
     private fun executeSystemButtonAction(actionKey: String) {
         when (actionKey) {
             "hide_keyboard" -> {
@@ -390,11 +377,14 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             }
             else -> { // "toggle_hud"
                 val isShown = FloatingHUDManager.toggleFloater(this)
-                hudStatus?.text = if (isShown) "Overlay: Visible" else "Overlay: Hidden"
+                hudStatus?.setText(if (isShown) R.string.hud_overlay_visible else R.string.hud_overlay_hidden)
             }
         }
     }
 
+    /**
+     * Handles hardware button releases, clearing modifier states and mouse layer flags.
+     */
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
             engine.onKeyEvent(keyCode, isDown = false)
@@ -408,7 +398,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         return super.onKeyUp(keyCode, event)
     }
 
-    override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         FloatingHUDManager.activeEngine = engine
         updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
@@ -416,7 +406,8 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-        engine.resetTracking()
+        engine.backToBaseLayer()
+        engine.resetAll()
         lastStickX = 0f
         lastStickY = 0f
         updateHud(lastEvent = null, x = 0f, y = 0f)
@@ -425,7 +416,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
     override fun onDestroy() {
         super.onDestroy()
         engine.backToBaseLayer()
-        engine.resetTracking()
+        engine.resetAll()
         ThemeManager.unregister(this)
         if (FloatingHUDManager.activeEngine === engine) {
             FloatingHUDManager.activeEngine = null
@@ -436,6 +427,9 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         applyThemeToIME(theme)
     }
 
+    /**
+     * Applies the selected [ThemeManager.ColorScheme] styling across all IME view components.
+     */
     private fun applyThemeToIME(theme: ThemeManager.ColorScheme) {
         radialHUD?.applyColorScheme(theme)
         rootView?.setBackgroundColor(theme.cardBackground)
@@ -446,6 +440,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         rootView?.findViewById<TextView>(R.id.tv_ime_cheatsheet2)?.setTextColor(theme.headerText)
     }
 
+    /**
+     * Updates the HUD visual telemetry (zone label, active modifiers, last emitted char/action,
+     * and stick aiming reticle).
+     */
     private fun updateHud(lastEvent: InputEngine.ProcessedEvent? = null, x: Float, y: Float) {
         val mask = engine.currentButtonMask
         val layer = engine.currentLayer
@@ -453,14 +451,14 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
         val isMouse = engine.isMouseLayerActive
         val zoneLabel = if (isMouse) {
-            "🐭 MOUSE LAYER"
+            getString(R.string.layer_mouse)
         } else when (layer) {
-            InputEngine.Layer.BASE -> "BASE LAYER"
-            InputEngine.Layer.MORE_SYM -> if (isSecond) "SYM 2" else "SYM 1"
-            InputEngine.Layer.NUM_SYM -> if (isSecond) "NUM (9-0)" else "NUM (1-8)"
-            InputEngine.Layer.FN -> if (isSecond) "FN (9-12)" else "FN (1-8)"
-            InputEngine.Layer.Q_Z -> if (isSecond) "Q-Z (Y-Z)" else "Q-Z (Q-X)"
-            InputEngine.Layer.MACRO -> "MACROS"
+            InputEngine.Layer.BASE -> getString(R.string.layer_base)
+            InputEngine.Layer.MORE_SYM -> getString(if (isSecond) R.string.layer_sym_2 else R.string.layer_sym_1)
+            InputEngine.Layer.NUM_SYM -> getString(if (isSecond) R.string.layer_num_2 else R.string.layer_num_1)
+            InputEngine.Layer.FN -> getString(if (isSecond) R.string.layer_fn_2 else R.string.layer_fn_1)
+            InputEngine.Layer.Q_Z -> getString(if (isSecond) R.string.layer_qz_2 else R.string.layer_qz_1)
+            InputEngine.Layer.MACRO -> getString(R.string.layer_macros)
             else -> layer.displayName
         }
         hudZone?.text = zoneLabel
@@ -480,18 +478,22 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         if (isSuper) activeMods.add("WIN")
         if (isSecond) activeMods.add("2ND")
 
-        val modText = if (activeMods.isEmpty()) "MODS: NONE" else "MODS: " + activeMods.joinToString("+")
+        val modText = if (activeMods.isEmpty()) {
+            getString(R.string.hud_mods_none)
+        } else {
+            getString(R.string.hud_mods_format, activeMods.joinToString("+"))
+        }
         hudModifiers?.text = modText
 
         if (isMouse) {
-            hudStatus?.text = "D-Pad: ← Left Click | → Right Click | ↑ Mid Click"
+            hudStatus?.setText(R.string.hud_mouse_dpad_help)
         } else if (lastEvent != null) {
             val displayChar = when {
                 lastEvent.charCode in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
                     val slot = lastEvent.charCode - InputEngine.KEY_MACRO_0
-                    "MACRO: " + MacroManager.getMacro(slot).displayName
+                    getString(R.string.hud_macro_format, MacroManager.getMacro(slot).displayName)
                 }
-                lastEvent.charCode == InputEngine.KEY_SUPER -> "WIN (Super)"
+                lastEvent.charCode == InputEngine.KEY_SUPER -> getString(R.string.action_super)
                 lastEvent.charCode == InputEngine.KEY_DELETE -> "DEL"
                 lastEvent.charCode == InputEngine.KEY_VOL_UP -> "VOL+"
                 lastEvent.charCode == InputEngine.KEY_VOL_DOWN -> "VOL-"
@@ -504,10 +506,15 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 lastEvent.charCode == InputEngine.KEY_INSERT -> "INS"
                 lastEvent.char == '\n' -> "\\n"
                 lastEvent.char == '\t' -> "\\t"
-                lastEvent.char == ' '  -> "SPACE"
+                lastEvent.char == ' '  -> getString(R.string.action_space)
+                lastEvent.isCtrl && lastEvent.charCode in 1..26 -> "Ctrl+" + ('A'.code + lastEvent.charCode - 1).toChar()
+                lastEvent.isCtrl && lastEvent.char in 'a'..'z' -> "Ctrl+" + lastEvent.char.uppercaseChar()
+                lastEvent.isCtrl && lastEvent.char in 'A'..'Z' -> "Ctrl+" + lastEvent.char
+                lastEvent.isAlt && lastEvent.char in 'a'..'z' -> "Alt+" + lastEvent.char.uppercaseChar()
+                lastEvent.isSuper && lastEvent.char in 'a'..'z' -> "Win+" + lastEvent.char.uppercaseChar()
                 else -> lastEvent.char.toString()
             }
-            hudStatus?.text = "Emitted: '$displayChar'"
+            hudStatus?.text = getString(R.string.hud_emitted_format, displayChar)
         } else {
             hudStatus?.text = getString(R.string.hud_status_ready)
         }

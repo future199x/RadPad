@@ -4,20 +4,43 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
+import androidx.core.content.edit
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * MacroManager: Centralized repository, persistence, and execution engine
- * for user-configurable macros in the RadPad MACRO radial layer.
+ * Centralized repository, persistence, and execution engine for user-configurable macros
+ * assigned to the 8 compass sectors of the RadPad `MACRO` radial layer.
+ *
+ * Supports three macro archetypes:
+ * 1. [MacroType.ACTION]: Context-menu actions (Copy, Paste, Cut, Undo, Select All) falling back to Ctrl+key combos.
+ * 2. [MacroType.KEY_COMBO]: Arbitrary key combinations with modifier masks (Ctrl+Shift+Z, Win+D, Alt+Tab, etc.).
+ * 3. [MacroType.TEXT]: Direct text snippets committed atomically via [InputConnection.commitText].
  */
 object MacroManager {
 
+    /**
+     * Archetype classification for macros.
+     */
     enum class MacroType {
+        /** Android context-menu or system editing action. */
+        ACTION,
+        /** Synthetic key down/up event with metaState modifier flags. */
         KEY_COMBO,
-        TEXT,
-        ACTION
+        /** Plain string snippet committed directly to active input field. */
+        TEXT
     }
 
+    /**
+     * Immutable model representing a single assigned macro.
+     *
+     * @param id Unique identifier string for presets (e.g. "copy") or custom macros ("custom_0").
+     * @param displayName User-facing title displayed in menus and status bars (e.g. "Copy (Ctrl+C)").
+     * @param shortHudLabel Compact 4-6 character abbreviation rendered in the radial dial sector.
+     * @param type The [MacroType] archetype.
+     * @param keyCode Android [KeyEvent] keycode dispatched when activated.
+     * @param metaModifiers Active modifier bitmask ([KeyEvent.META_CTRL_ON], etc.).
+     * @param textPayload Text payload committed when [type] is [MacroType.TEXT].
+     */
     data class MacroItem(
         val id: String,
         val displayName: String,
@@ -28,6 +51,9 @@ object MacroManager {
         val textPayload: String = ""
     )
 
+    /**
+     * Result wrapper for user-entered custom macro validation.
+     */
     sealed class ValidationResult {
         data class Valid(val item: MacroItem, val description: String) : ValidationResult()
         data class Invalid(val errorMessage: String) : ValidationResult()
@@ -79,10 +105,9 @@ object MacroManager {
         if (!listeners.contains(listener)) listeners.add(listener)
     }
 
-    fun unregisterListener(listener: Listener) {
-        listeners.remove(listener)
-    }
-
+    /**
+     * Initializes the macro manager and restores slot assignments from SharedPreferences.
+     */
     fun init(context: Context) {
         if (prefs == null) {
             prefs = context.getSharedPreferences("radpad_macros", Context.MODE_PRIVATE)
@@ -118,23 +143,32 @@ object MacroManager {
         }
     }
 
+    /**
+     * Retrieves the active [MacroItem] assigned to the specified compass [slot] (0..7).
+     */
     fun getMacro(slot: Int): MacroItem {
         if (slot in 0..7) return currentSlots[slot]
         return currentSlots[0]
     }
 
+    /**
+     * Assigns a preset macro identified by [presetId] to [slot], persisting the change.
+     */
     fun setMacro(slot: Int, presetId: String) {
         if (slot !in 0..7) return
         val item = PRESETS.firstOrNull { it.id == presetId } ?: return
         currentSlots[slot] = item
-        prefs?.edit()?.putString("slot_$slot", presetId)?.apply()
+        prefs?.edit { putString("slot_$slot", presetId) }
         for (l in listeners) l.onMacrosChanged()
     }
 
+    /**
+     * Assigns a custom [MacroItem] to [slot] and persists its parameters.
+     */
     fun setCustomMacro(slot: Int, item: MacroItem) {
         if (slot !in 0..7) return
         currentSlots[slot] = item
-        prefs?.edit()?.apply {
+        prefs?.edit {
             putString("slot_$slot", "custom")
             putString("slot_${slot}_name", item.displayName)
             putString("slot_${slot}_label", item.shortHudLabel)
@@ -142,7 +176,6 @@ object MacroManager {
             putInt("slot_${slot}_code", item.keyCode)
             putInt("slot_${slot}_mods", item.metaModifiers)
             putString("slot_${slot}_text", item.textPayload)
-            apply()
         }
         for (l in listeners) l.onMacrosChanged()
     }
@@ -188,7 +221,7 @@ object MacroManager {
         var keyToken: String? = null
 
         for (token in tokens) {
-            when (val lower = token.lowercase()) {
+            when (token.lowercase()) {
                 "ctrl", "control" -> {
                     metaModifiers = metaModifiers or KeyEvent.META_CTRL_ON
                     if (!modifierNames.contains("Ctrl")) modifierNames.add("Ctrl")

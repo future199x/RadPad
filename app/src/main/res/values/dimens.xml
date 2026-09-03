@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing tokens (4dp grid) -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_lg">16dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_xxl">32dp</dimen>
+    
+    <!-- Card dimensions -->
+    <dimen name="card_corner_radius">16dp</dimen>
+    <dimen name="card_elevation">2dp</dimen>
+    <dimen name="card_padding">16dp</dimen>
+    <dimen name="card_margin">12dp</dimen>
+    
+    <!-- Button dimensions -->
+    <dimen name="button_height">52dp</dimen>
+    <dimen name="button_corner_radius">12dp</dimen>
+    
+    <!-- Typography -->
+    <dimen name="text_title">22sp</dimen>
+    <dimen name="text_subtitle">14sp</dimen>
+    <dimen name="text_body">13sp</dimen>
+    <dimen name="text_caption">11sp</dimen>
+    <dimen name="text_overline">10sp</dimen>
+    
+    <!-- Radial HUD -->
+    <dimen name="radial_hud_size">220dp</dimen>
+    <dimen name="radial_hud_floating_size">170dp</dimen>
+</resources>

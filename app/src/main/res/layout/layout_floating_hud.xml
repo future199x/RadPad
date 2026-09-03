@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="⠿ RADPAD"
-            android:textColor="#7AA2F7"
+            android:textColor="@color/accent_primary"
             android:textSize="10sp"
             android:textStyle="bold" />
 
@@ -37,12 +37,12 @@
             android:id="@+id/btn_floating_mode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
             android:layout_marginEnd="6dp"
             android:text="ABC"
-            android:textColor="#A6E3A1"
+            android:textColor="@color/accent_success"
             android:textSize="9sp"
             android:textStyle="bold" />
 
@@ -53,7 +53,7 @@
             android:layout_height="22dp"
             android:gravity="center"
             android:text="✕"
-            android:textColor="#F7768E"
+            android:textColor="@color/accent_danger"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -75,10 +75,10 @@
             android:layout_weight="1"
             android:gravity="center"
             android:layout_marginHorizontal="1dp"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingVertical="2dp"
             android:text="CAPS"
-            android:textColor="#565F89"
+            android:textColor="@color/text_muted"
             android:textSize="8sp"
             android:textStyle="bold" />
 
@@ -89,10 +89,10 @@
             android:layout_weight="1"
             android:gravity="center"
             android:layout_marginHorizontal="1dp"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingVertical="2dp"
             android:text="SHIFT"
-            android:textColor="#565F89"
+            android:textColor="@color/text_muted"
             android:textSize="8sp"
             android:textStyle="bold" />
 
@@ -103,10 +103,10 @@
             android:layout_weight="1"
             android:gravity="center"
             android:layout_marginHorizontal="1dp"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingVertical="2dp"
             android:text="CTRL"
-            android:textColor="#565F89"
+            android:textColor="@color/text_muted"
             android:textSize="8sp"
             android:textStyle="bold" />
 
@@ -117,10 +117,10 @@
             android:layout_weight="1"
             android:gravity="center"
             android:layout_marginHorizontal="1dp"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingVertical="2dp"
             android:text="ALT"
-            android:textColor="#565F89"
+            android:textColor="@color/text_muted"
             android:textSize="8sp"
             android:textStyle="bold" />
 
@@ -131,10 +131,10 @@
             android:layout_weight="1"
             android:gravity="center"
             android:layout_marginHorizontal="1dp"
-            android:background="#2E3440"
+            android:background="@color/surface_elevated"
             android:paddingVertical="2dp"
             android:text="WIN"
-            android:textColor="#565F89"
+            android:textColor="@color/text_muted"
             android:textSize="8sp"
             android:textStyle="bold" />
     </LinearLayout>

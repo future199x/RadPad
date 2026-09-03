@@ -7,11 +7,11 @@
     android:id="@+id/ime_root_layout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#12131F"
+    android:background="@drawable/bg_ime_panel"
     android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:paddingTop="8dp"
-    android:paddingBottom="12dp">
+    android:paddingTop="12dp"
+    android:paddingBottom="14dp">
 
     <!-- Top Status Header -->
     <LinearLayout
@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/hud_status_ready"
-            android:textColor="#C0CAF5"
+            android:textColor="@color/text_primary"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -36,9 +36,9 @@
             android:id="@+id/tv_hud_modifiers"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="10dp"
             android:text="MODS: NONE"
-            android:textColor="#9ECE6A"
+            android:textColor="@color/status_connected"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -47,7 +47,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="ZONE 0"
-            android:textColor="#7AA2F7"
+            android:textColor="@color/accent_primary"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -74,7 +74,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="▢ ⌫ (L2+▢: ⌦)  •  ✕ Space  •  △ Enter  •  ○ Tab  •  L2 Shift"
-            android:textColor="#BAC2DE"
+            android:textColor="@color/text_secondary"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -84,7 +84,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="R1 Numbers  •  L1/R2 Layers  •  L-Stick ➔ Win  •  L3 Caps  •  R3 Esc"
-            android:textColor="#7AA2F7"
+            android:textColor="@color/accent_primary"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>

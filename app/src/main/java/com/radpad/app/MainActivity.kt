@@ -1,33 +1,45 @@
 package com.radpad.app
 
-import android.app.Activity
 import android.app.AlertDialog
-import android.text.Editable
-import android.text.TextWatcher
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.hardware.input.InputManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup.LayoutParams
 import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Spinner
-import android.widget.Switch
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.SwitchCompat
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import java.util.Locale
 
 /**
- * MainActivity: Diagnostic Controller Detector, Live Radial Dial Telemetry, and Setup.
+ * Diagnostic controller detector, live radial dial telemetry tester, and setup configurator.
+ *
+ * ## Responsibilities
+ * - **Controller Detection**: Monitors gamepad hardware attachments via [InputManager.InputDeviceListener].
+ * - **Live Telemetry**: Real-time interactive preview of [KinematicRadialHUDView] reflecting stick aiming and layers.
+ * - **Guided Setup**: 3-step setup flow for IME enablement, keyboard selection, and floating HUD overlay.
+ * - **System Customization**: Configures radial symmetry, color scheme, button actions, and macro mappings.
+ * - **Cheatsheet Reference**: Collapsible reference accordion for all controller button mappings.
  */
-class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.ThemeListener, FloatingHUDManager.Listener {
+class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, ThemeManager.ThemeListener, FloatingHUDManager.Listener {
 
     private lateinit var tvStatus: TextView
     private lateinit var tvDetail: TextView
@@ -61,6 +73,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
     private var lastHatY: Float = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -72,6 +85,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         val btnEnable = findViewById<Button>(R.id.btn_enable_ime)
         val btnSelect = findViewById<Button>(R.id.btn_select_ime)
         btnFloatingHud = findViewById(R.id.btn_floating_hud)
+        updateFloatingButtonState(FloatingHUDService.isRunning)
 
         btnEnable.setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -86,27 +100,43 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             toggleFloatingHUD()
         }
 
+        // Collapsible Button Mapping Accordion
+        findViewById<View>(R.id.btn_toggle_button_map)?.setOnClickListener {
+            val container = findViewById<View>(R.id.container_button_map)
+            val chevron = findViewById<TextView>(R.id.icon_chevron)
+            if (container?.visibility == View.VISIBLE) {
+                container.visibility = View.GONE
+                chevron?.setText(R.string.chevron_down)
+            } else {
+                container?.visibility = View.VISIBLE
+                chevron?.setText(R.string.chevron_up)
+            }
+        }
+
         // Slices Symmetry Setting Switch
-        val swSymmetric = findViewById<Switch>(R.id.sw_symmetric_slices)
-        val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+        val swSymmetric = findViewById<SwitchCompat>(R.id.sw_symmetric_slices)
+        val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
         val isSymmetric = prefs.getBoolean("is_symmetric_slices", true)
         swSymmetric.isChecked = isSymmetric
         radialHUD?.isSymmetric = isSymmetric
         engine.setSymmetricSlices(isSymmetric)
 
         swSymmetric.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("is_symmetric_slices", isChecked).apply()
+            prefs.edit { putBoolean("is_symmetric_slices", isChecked) }
             radialHUD?.isSymmetric = isChecked
             engine.setSymmetricSlices(isChecked)
         }
 
-
         // Button Action Spinners (Select and Start)
-        val buttonActions = arrayOf("Toggle HUD", "Hide Keyboard", "Toggle HUD + Hide Keyboard")
+        val buttonActions = arrayOf(
+            getString(R.string.action_name_toggle_hud),
+            getString(R.string.action_name_hide_keyboard),
+            getString(R.string.action_name_toggle_hud_hide_keyboard)
+        )
         val buttonActionKeys = arrayOf("toggle_hud", "hide_keyboard", "toggle_hud_hide_keyboard")
 
-        val actionAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, buttonActions).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val actionAdapter = ArrayAdapter(this, R.layout.item_spinner, buttonActions).apply {
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
 
         // Select / Share Button Spinner
@@ -119,7 +149,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         spnSelectAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val chosenKey = buttonActionKeys[position]
-                prefs.edit().putString("select_button_action", chosenKey).apply()
+                prefs.edit { putString("select_button_action", chosenKey) }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -134,7 +164,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         spnStartAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val chosenKey = buttonActionKeys[position]
-                prefs.edit().putString("start_button_action", chosenKey).apply()
+                prefs.edit { putString("start_button_action", chosenKey) }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -143,10 +173,10 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         ThemeManager.register(this)
 
         val spnTheme = findViewById<Spinner>(R.id.spn_color_scheme)
-        val themes = ThemeManager.ColorScheme.values()
+        val themes = ThemeManager.ColorScheme.entries
         val themeNames = themes.map { it.displayName }
-        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, themeNames).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val adapter = ArrayAdapter(this, R.layout.item_spinner, themeNames).apply {
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
         spnTheme.adapter = adapter
         val currentIdx = themes.indexOf(ThemeManager.currentTheme).coerceAtLeast(0)
@@ -166,7 +196,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         MacroManager.init(this)
         setupMacroControls()
 
-        inputManager = getSystemService(Context.INPUT_SERVICE) as? InputManager
+        inputManager = getSystemService(INPUT_SERVICE) as? InputManager
         inputManager?.registerInputDeviceListener(this, null)
         FloatingHUDManager.register(this)
 
@@ -203,9 +233,15 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         }
     }
 
+    override fun onFloaterStateChanged(isRunning: Boolean) {
+        runOnUiThread {
+            updateFloatingButtonState(isRunning)
+        }
+    }
+
     override fun onThemeChanged(theme: ThemeManager.ColorScheme) {
         radialHUD?.applyColorScheme(theme)
-        findViewById<View>(R.id.banner_controller_status)?.setBackgroundColor(theme.cardBackground)
+        findViewById<View>(R.id.banner_controller_status)?.backgroundTintList = ColorStateList.valueOf(theme.cardBackground)
         findViewById<TextView>(R.id.tv_controller_detail)?.setTextColor(theme.inactiveText)
         refreshRadialHUD()
     }
@@ -237,14 +273,14 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         val currentMacro = MacroManager.getMacro(slot)
         val options = MacroManager.PRESETS.map { it.displayName }.toMutableList()
         val customOption = if (currentMacro.id.startsWith("custom")) {
-            "✏️ ${currentMacro.displayName} [${currentMacro.shortHudLabel}]"
+            getString(R.string.macro_custom_option_format, currentMacro.displayName, currentMacro.shortHudLabel)
         } else {
-            "✏️ Custom / Key Combo..."
+            getString(R.string.macro_custom_option_default)
         }
         options.add(customOption)
 
-        val spinnerAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, options).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val spinnerAdapter = ArrayAdapter(this, R.layout.item_spinner, options).apply {
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
         spn.adapter = spinnerAdapter
 
@@ -286,10 +322,16 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
     private fun showCustomMacroDialog(slot: Int) {
         val current = MacroManager.getMacro(slot)
         val directions = arrayOf(
-            "North (0°)", "NorthEast (45°)", "East (90°)", "SouthEast (135°)",
-            "South (180°)", "SouthWest (225°)", "West (270°)", "NorthWest (315°)"
+            getString(R.string.macro_dir_north),
+            getString(R.string.macro_dir_northeast),
+            getString(R.string.macro_dir_east),
+            getString(R.string.macro_dir_southeast),
+            getString(R.string.macro_dir_south),
+            getString(R.string.macro_dir_southwest),
+            getString(R.string.macro_dir_west),
+            getString(R.string.macro_dir_northwest)
         )
-        val slotDir = directions.getOrElse(slot) { "Slot ${slot + 1}" }
+        val slotDir = directions.getOrElse(slot) { getString(R.string.macro_slot_fallback, slot + 1) }
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -297,32 +339,42 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         }
 
         val tvInfo = TextView(this).apply {
-            text = "Enter key combo (e.g. ctrl+shift+z, win+shift+s, alt+tab) or text (e.g. text:hello):"
+            setText(R.string.macro_info_text)
             textSize = 12f
-            setTextColor(0xFFBAC2DE.toInt())
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
             setPadding(0, 0, 0, 16)
         }
         layout.addView(tvInfo)
 
         val etCombo = EditText(this).apply {
-            hint = "Key combo (e.g. ctrl+shift+z)"
+            setHint(R.string.macro_combo_hint)
             setText(if (current.type == MacroManager.MacroType.TEXT) "text:${current.textPayload}" else current.displayName)
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF6C7086.toInt())
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_muted))
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_input_field)
+            setPadding(30, 24, 30, 24)
         }
         layout.addView(etCombo)
 
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 20)
+        }
+        layout.addView(spacer)
+
         val etLabel = EditText(this).apply {
-            hint = "Short HUD Label (e.g. REDO, max 6 chars)"
+            setHint(R.string.macro_label_hint)
             setText(current.shortHudLabel)
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF6C7086.toInt())
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_muted))
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_input_field)
+            setPadding(30, 24, 30, 24)
         }
         layout.addView(etLabel)
 
         val tvStatus = TextView(this).apply {
-            text = "Validating..."
+            setText(R.string.macro_status_validating)
             textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_tertiary))
             setPadding(0, 16, 0, 0)
         }
         layout.addView(tvStatus)
@@ -330,10 +382,10 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         var validatedItem: MacroManager.MacroItem? = null
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Slot ${slot + 1}: $slotDir")
+            .setTitle(getString(R.string.macro_dialog_title, slot + 1, slotDir))
             .setView(layout)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel") { _, _ ->
+            .setPositiveButton(R.string.btn_save, null)
+            .setNegativeButton(R.string.btn_cancel) { _, _ ->
                 refreshMacroSpinners()
             }
             .create()
@@ -341,19 +393,18 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         fun validate() {
             val comboText = etCombo.text.toString()
             val labelText = etLabel.text.toString()
-            val result = MacroManager.parse(comboText, labelText)
-            when (result) {
+            when (val result = MacroManager.parse(comboText, labelText)) {
                 is MacroManager.ValidationResult.Valid -> {
                     validatedItem = result.item
-                    tvStatus.text = "✓ ${result.description}"
-                    tvStatus.setTextColor(0xFFA6E3A1.toInt())
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = true
+                    tvStatus.text = getString(R.string.macro_status_valid, result.description)
+                    tvStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_success))
+                    dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.isEnabled = true
                 }
                 is MacroManager.ValidationResult.Invalid -> {
                     validatedItem = null
-                    tvStatus.text = "✗ ${result.errorMessage}"
-                    tvStatus.setTextColor(0xFFF38BA8.toInt())
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = false
+                    tvStatus.text = getString(R.string.macro_status_invalid, result.errorMessage)
+                    tvStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_danger))
+                    dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.isEnabled = false
                 }
             }
         }
@@ -368,7 +419,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
 
         dialog.setOnShowListener {
             validate()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
                 val item = validatedItem
                 if (item != null) {
                     MacroManager.setCustomMacro(slot, item)
@@ -390,13 +441,13 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         val tvAccessibility = findViewById<TextView>(R.id.tv_accessibility_status)
         val btnAccessibility = findViewById<Button>(R.id.btn_enable_accessibility)
         if (RadPadAccessibilityService.isEnabled) {
-            tvAccessibility?.text = "✓ System Clicks: Enabled"
-            tvAccessibility?.setTextColor(0xFFA6E3A1.toInt())
-            btnAccessibility?.text = "Configured"
+            tvAccessibility?.setText(R.string.accessibility_status_enabled)
+            tvAccessibility?.setTextColor(ContextCompat.getColor(this, R.color.accent_success))
+            btnAccessibility?.setText(R.string.btn_clicks_configured)
         } else {
-            tvAccessibility?.text = "⚠️ System Clicks: Disabled"
-            tvAccessibility?.setTextColor(0xFFF38BA8.toInt())
-            btnAccessibility?.text = "Enable Clicks"
+            tvAccessibility?.setText(R.string.accessibility_status_disabled)
+            tvAccessibility?.setTextColor(ContextCompat.getColor(this, R.color.accent_danger))
+            btnAccessibility?.setText(R.string.btn_clicks_enable)
         }
     }
 
@@ -410,49 +461,39 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
     private fun executeSystemButtonAction(buttonName: String, actionKey: String) {
         when (actionKey) {
             "hide_keyboard" -> {
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
-                tvLiveInput.text = "$buttonName Button -> Action: Hide Keyboard"
+                tvLiveInput.text = getString(R.string.action_hide_keyboard_desc, buttonName)
             }
             "toggle_hud_hide_keyboard" -> {
                 toggleFloatingHUD()
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
-                tvLiveInput.text = "$buttonName Button -> Action: Toggle HUD + Hide Keyboard"
+                tvLiveInput.text = getString(R.string.action_toggle_hud_hide_desc, buttonName)
             }
             else -> { // "toggle_hud"
                 toggleFloatingHUD()
-                tvLiveInput.text = "$buttonName Button -> Action: Toggle HUD"
+                tvLiveInput.text = getString(R.string.action_toggle_hud_desc, buttonName)
             }
         }
     }
 
     private fun toggleFloatingHUD() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
-            return
-        }
-
-        val serviceIntent = Intent(this, FloatingHUDService::class.java)
-        if (FloatingHUDService.isRunning) {
-            stopService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
-        updateFloatingButtonState()
+        val willRun = FloatingHUDManager.toggleFloater(this)
+        updateFloatingButtonState(willRun)
     }
 
-    private fun updateFloatingButtonState() {
-        if (FloatingHUDService.isRunning) {
-            btnFloatingHud.text = "✕ Close Always-On Floating HUD"
-            btnFloatingHud.setBackgroundColor(0xFFC53B53.toInt())
+    private fun updateFloatingButtonState(isRunning: Boolean = FloatingHUDService.isRunning) {
+        if (isRunning) {
+            btnFloatingHud.setText(R.string.btn_close_floating_hud)
+            btnFloatingHud.backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.button_danger)
+            )
         } else {
-            btnFloatingHud.text = "📌 Launch Always-On Floating HUD"
-            btnFloatingHud.setBackgroundColor(0xFF2E7D32.toInt())
+            btnFloatingHud.setText(R.string.btn_launch_floating_hud)
+            btnFloatingHud.backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this, R.color.button_launch)
+            )
         }
     }
 
@@ -478,13 +519,13 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         }
 
         if (gamepadNames.isNotEmpty()) {
-            tvStatus.text = "🎮 Gamepad Ready: ${gamepadNames.joinToString(", ")}"
-            tvStatus.setTextColor(0xFF9ECE6A.toInt())
-            tvDetail.text = "Aim Right Stick. Press R1 to Select. L1 returns to Base. Hold R2 for 2nd tier."
+            tvStatus.text = getString(R.string.status_gamepad_ready, gamepadNames.joinToString(", "))
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.status_connected))
+            tvDetail.setText(R.string.detail_gamepad_ready)
         } else {
-            tvStatus.text = "⚠️ No Gamepad Detected in Android"
-            tvStatus.setTextColor(0xFFF7768E.toInt())
-            tvDetail.text = "Android sees: " + allDevices.joinToString(", ")
+            tvStatus.setText(R.string.status_no_gamepad)
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.status_disconnected))
+            tvDetail.text = getString(R.string.detail_android_sees, allDevices.joinToString(", "))
         }
     }
 
@@ -493,77 +534,44 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         isSecondLayer = engine.isSecondLayerActive
 
         radialHUD?.updateState(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
+        FloatingHUDManager.updateInput(currentX, currentY, currentLayer, isSecondLayer, isShift, isCtrl, isAlt, isCaps, isSuper)
     }
 
     private fun onDpadAction(dir: String) {
-        tvStatus.text = "🎮 D-Pad Navigation: $dir"
-        tvStatus.setTextColor(0xFF7AA2F7.toInt())
-        tvLiveInput.text = "D-Pad: $dir"
+        tvStatus.text = getString(R.string.status_dpad_nav, dir)
+        tvStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_primary))
+        tvLiveInput.text = getString(R.string.live_dpad_nav, dir)
     }
 
+    /**
+     * Dispatches analog stick deflection and trigger pressure updates into [InputEngine]
+     * and [VirtualMouseManager], updating the live status view and radial dial preview.
+     */
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        val lx = event.getAxisValue(MotionEvent.AXIS_X)
-        val ly = event.getAxisValue(MotionEvent.AXIS_Y)
+        val (lx, ly) = InputEngine.readLeftStick(event)
+        val (rx, ry) = InputEngine.readRightStick(event)
+        currentX = rx
+        currentY = ry
 
-        val ENGAGE = 0.35f
-        val RELEASE = 0.20f
+        val standaloneSuper = engine.onMotionEvent(event)
 
-        leftStickShiftActive = if (leftStickShiftActive) ly <= -RELEASE else ly <= -ENGAGE
-        leftStickCtrlActive = if (leftStickCtrlActive) ly >= RELEASE else ly >= ENGAGE
-        leftStickAltActive = if (leftStickAltActive) lx <= -RELEASE else lx <= -ENGAGE
-        leftStickSuperActive = if (leftStickSuperActive) lx >= RELEASE else lx >= ENGAGE
+        leftStickShiftActive = engine.isLeftStickShiftActive
+        leftStickCtrlActive = engine.isLeftStickCtrlActive
+        leftStickAltActive = engine.isLeftStickAltActive
+        leftStickSuperActive = engine.isLeftStickSuperActive
 
-        isCtrl = leftStickCtrlActive
-        isAlt = leftStickAltActive
-        isSuper = leftStickSuperActive
+        isCtrl = engine.isCtrlActive
+        isAlt = engine.isAltActive
+        isSuper = engine.isSuperActive
 
-        val rawZ = event.getAxisValue(MotionEvent.AXIS_Z)
-        val rawRZ = event.getAxisValue(MotionEvent.AXIS_RZ)
-        val rawRX = event.getAxisValue(MotionEvent.AXIS_RX)
-        val rawRY = event.getAxisValue(MotionEvent.AXIS_RY)
-        currentX = if (rawZ != 0f || rawRZ != 0f) rawZ else rawRX
-        currentY = if (rawZ != 0f || rawRZ != 0f) rawRZ else rawRY
+        val l2Val = InputEngine.readTriggerAxis(event, MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_BRAKE)
+        val r2Val = InputEngine.readTriggerAxis(event, MotionEvent.AXIS_RTRIGGER, MotionEvent.AXIS_GAS)
 
-        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
-        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+        l2TriggerActive = InputEngine.hysteresis(l2TriggerActive, l2Val, InputEngine.TRIGGER_ENGAGEMENT_THRESHOLD, InputEngine.TRIGGER_RELEASE_THRESHOLD)
+        r2TriggerActive = InputEngine.hysteresis(r2TriggerActive, r2Val, InputEngine.TRIGGER_ENGAGEMENT_THRESHOLD, InputEngine.TRIGGER_RELEASE_THRESHOLD)
 
-        if (hatX != lastHatX) {
-            if (hatX < -0.5f) onDpadAction("← Left")
-            else if (hatX > 0.5f) onDpadAction("→ Right")
-            lastHatX = hatX
-        }
-
-        if (hatY != lastHatY) {
-            if (hatY < -0.5f) onDpadAction("↑ Up")
-            else if (hatY > 0.5f) onDpadAction("↓ Down")
-            lastHatY = hatY
-        }
-
-        val hasLTrigger = event.device?.getMotionRange(MotionEvent.AXIS_LTRIGGER) != null
-        val l2Val = if (hasLTrigger) {
-            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
-        } else if (event.device?.getMotionRange(MotionEvent.AXIS_BRAKE) != null) {
-            event.getAxisValue(MotionEvent.AXIS_BRAKE)
-        } else {
-            event.getAxisValue(MotionEvent.AXIS_LTRIGGER)
-        }
-
-        val hasRTrigger = event.device?.getMotionRange(MotionEvent.AXIS_RTRIGGER) != null
-        val r2Val = if (hasRTrigger) {
-            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-        } else if (event.device?.getMotionRange(MotionEvent.AXIS_GAS) != null) {
-            event.getAxisValue(MotionEvent.AXIS_GAS)
-        } else {
-            event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-        }
-
-        l2TriggerActive = if (l2TriggerActive) l2Val >= 0.25f else l2Val >= 0.5f
-        r2TriggerActive = if (r2TriggerActive) r2Val >= 0.25f else r2Val >= 0.5f
-
-        isShift = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
+        isShift = engine.isShiftActive
         isSecondLayer = engine.isSecondLayerActive
-
-        engine.onMotionEvent(event)
 
         val isMouseActive = isR2ButtonDown || r2TriggerActive
         val wasMouseActive = VirtualMouseManager.isMouseLayerActive
@@ -571,16 +579,19 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             VirtualMouseManager.setMouseLayerActive(this, isMouseActive)
         }
 
+        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+
         if (isMouseActive) {
             VirtualMouseManager.updateStick(currentX, currentY)
 
             if (hatX != lastHatX) {
                 if (hatX < -0.5f) {
                     VirtualMouseManager.performLeftClick()
-                    tvLiveInput.text = "Mouse: Left Click"
+                    tvLiveInput.setText(R.string.live_mouse_left_click)
                 } else if (hatX > 0.5f) {
                     VirtualMouseManager.performRightClick()
-                    tvLiveInput.text = "Mouse: Right Click"
+                    tvLiveInput.setText(R.string.live_mouse_right_click)
                 }
                 lastHatX = hatX
             }
@@ -588,27 +599,28 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             if (hatY != lastHatY) {
                 if (hatY < -0.5f) {
                     VirtualMouseManager.performMiddleClick()
-                    tvLiveInput.text = "Mouse: Middle Click"
+                    tvLiveInput.setText(R.string.live_mouse_middle_click)
                 }
                 lastHatY = hatY
             }
 
-            tvStatus.text = "🐭 Mouse Layer Active (Right Stick: Move | D-Pad: Click)"
-            tvStatus.setTextColor(0xFF89B4FA.toInt())
-            tvLiveInput.text = String.format("Mouse Cursor: (%.0f, %.0f) | Stick: (%+.2f, %+.2f)", VirtualMouseManager.cursorX, VirtualMouseManager.cursorY, currentX, currentY)
+            tvStatus.setText(R.string.status_mouse_layer_active)
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_info))
+            tvLiveInput.text = String.format(Locale.US, getString(R.string.live_mouse_cursor_format), VirtualMouseManager.cursorX, VirtualMouseManager.cursorY, currentX, currentY)
             refreshRadialHUD()
             return true
         }
 
+        // Standard D-Pad Hat Navigation (when Mouse Layer is inactive)
         if (hatX != lastHatX) {
-            if (hatX < -0.5f) onDpadAction("← Left")
-            else if (hatX > 0.5f) onDpadAction("→ Right")
+            if (hatX < -0.5f) onDpadAction(getString(R.string.dpad_left))
+            else if (hatX > 0.5f) onDpadAction(getString(R.string.dpad_right))
             lastHatX = hatX
         }
 
         if (hatY != lastHatY) {
-            if (hatY < -0.5f) onDpadAction("↑ Up")
-            else if (hatY > 0.5f) onDpadAction("↓ Down")
+            if (hatY < -0.5f) onDpadAction(getString(R.string.dpad_up))
+            else if (hatY > 0.5f) onDpadAction(getString(R.string.dpad_down))
             lastHatY = hatY
         }
 
@@ -621,15 +633,28 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         if (isSecondLayer) activeMods.add("2ND")
         val modSummary = if (activeMods.isEmpty()) "NONE" else activeMods.joinToString("+")
 
-        val layerName = if (isSecondLayer) "${engine.currentLayer.displayName} (2nd)" else engine.currentLayer.displayName
-        tvStatus.text = "🎮 Controller Signal: Layer [$layerName]"
-        tvStatus.setTextColor(0xFF9ECE6A.toInt())
-        tvLiveInput.text = String.format("R-Stick: X:%+.2f Y:%+.2f | Mods: %s", currentX, currentY, modSummary)
+        val layerName = if (isSecondLayer) {
+            getString(R.string.layer_second_suffix, engine.currentLayer.displayName)
+        } else {
+            engine.currentLayer.displayName
+        }
+        tvStatus.text = getString(R.string.status_controller_signal_layer, layerName)
+        tvStatus.setTextColor(ContextCompat.getColor(this, R.color.status_connected))
+
+        if (standaloneSuper != null) {
+            tvStatus.setText(R.string.status_left_stick_flick)
+            tvLiveInput.setText(R.string.live_left_stick_flick)
+        } else {
+            tvLiveInput.text = String.format(Locale.US, getString(R.string.live_telemetry_format), lx, ly, currentX, currentY, modSummary, l2Val, r2Val)
+        }
 
         refreshRadialHUD()
         return true
     }
 
+    /**
+     * Intercepts gamepad button presses for testing selection, navigation, and system shortcuts in the test suite.
+     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         var handled = true
         when (keyCode) {
@@ -637,50 +662,57 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 // Right Bumper: Select
                 val result = engine.onSelect()
                 val emitted = result?.let {
-                    when {
-                        it.charCode in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
+                    when (it.charCode) {
+                        in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
                             val slot = it.charCode - InputEngine.KEY_MACRO_0
-                            "MACRO: " + MacroManager.getMacro(slot).displayName
+                            getString(R.string.hud_macro_format, MacroManager.getMacro(slot).displayName)
                         }
-                        it.charCode == InputEngine.KEY_VOL_MUTE -> "VOL MUTE"
-                        it.charCode == InputEngine.KEY_VOL_UP -> "VOL+"
-                        it.charCode == InputEngine.KEY_VOL_DOWN -> "VOL-"
-                        it.charCode == InputEngine.KEY_DELETE -> "DEL"
-                        it.charCode in InputEngine.KEY_F1..InputEngine.KEY_F12 -> "F${it.charCode - InputEngine.KEY_F1 + 1}"
+                        InputEngine.KEY_VOL_MUTE -> "VOL MUTE"
+                        InputEngine.KEY_VOL_UP -> "VOL+"
+                        InputEngine.KEY_VOL_DOWN -> "VOL-"
+                        InputEngine.KEY_DELETE -> "DEL"
+                        in InputEngine.KEY_F1..InputEngine.KEY_F12 -> "F${it.charCode - InputEngine.KEY_F1 + 1}"
                         else -> it.char.toString()
                     }
-                } ?: "Selected Layer: ${engine.currentLayer.displayName}"
-                tvLiveInput.text = "R1 Select: $emitted"
+                } ?: getString(R.string.live_selected_layer, engine.currentLayer.displayName)
+                tvLiveInput.text = getString(R.string.live_r1_select, emitted)
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_L1 -> {
                 // Left Bumper: Go back one layer level (Page 2 -> Page 1 -> Base)
                 engine.goBackLayer()
-                tvLiveInput.text = "L1 Back: Layer [${engine.currentLayer.displayName}]"
+                tvLiveInput.text = getString(R.string.live_l1_back, engine.currentLayer.displayName)
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_L2 -> {
                 isL2ButtonDown = true
-                isShift = true
+                engine.onKeyEvent(keyCode, isDown = true)
+                isShift = engine.isShiftActive
+                handled = true
             }
             KeyEvent.KEYCODE_BUTTON_R2 -> {
                 isR2ButtonDown = true
+                engine.onKeyEvent(keyCode, isDown = true)
                 VirtualMouseManager.setMouseLayerActive(this, true)
-                tvStatus.text = "🐭 Mouse Layer Active (Right Stick: Move | D-Pad: Click)"
-                tvStatus.setTextColor(0xFF89B4FA.toInt())
-                tvLiveInput.text = "Mouse Layer Activated"
+                tvStatus.setText(R.string.status_mouse_layer_active)
+                tvStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_info))
+                tvLiveInput.setText(R.string.live_mouse_layer_activated)
                 handled = true
             }
-            KeyEvent.KEYCODE_BUTTON_THUMBL -> isCaps = !isCaps
+            KeyEvent.KEYCODE_BUTTON_THUMBL -> {
+                engine.onKeyEvent(keyCode, isDown = true)
+                isCaps = (engine.currentButtonMask and InputEngine.FLAG_CAPS_LOCK) != 0
+                handled = true
+            }
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
                 val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
                 executeSystemButtonAction("Select", action)
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_START -> {
-                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
                 val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
                 executeSystemButtonAction("Start", action)
                 handled = true
@@ -688,48 +720,61 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (isR2ButtonDown || r2TriggerActive) {
                     VirtualMouseManager.performLeftClick()
-                    tvLiveInput.text = "Mouse: Left Click"
+                    tvLiveInput.setText(R.string.live_mouse_left_click)
                     handled = true
                 } else {
-                    onDpadAction("← Left")
+                    onDpadAction(getString(R.string.dpad_left))
                 }
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (isR2ButtonDown || r2TriggerActive) {
                     VirtualMouseManager.performRightClick()
-                    tvLiveInput.text = "Mouse: Right Click"
+                    tvLiveInput.setText(R.string.live_mouse_right_click)
                     handled = true
                 } else {
-                    onDpadAction("→ Right")
+                    onDpadAction(getString(R.string.dpad_right))
                 }
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
                 if (isR2ButtonDown || r2TriggerActive) {
                     VirtualMouseManager.performMiddleClick()
-                    tvLiveInput.text = "Mouse: Middle Click"
+                    tvLiveInput.setText(R.string.live_mouse_middle_click)
                     handled = true
                 } else {
-                    onDpadAction("↑ Up")
+                    onDpadAction(getString(R.string.dpad_up))
                 }
             }
-            KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction("↓ Down")
-            KeyEvent.KEYCODE_BUTTON_A,
-            KeyEvent.KEYCODE_BUTTON_B,
-            KeyEvent.KEYCODE_BUTTON_X,
+            KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction(getString(R.string.dpad_down))
+            KeyEvent.KEYCODE_BUTTON_X -> {
+                tvLiveInput.setText(if (isShift) R.string.live_square_del else R.string.live_square_backspace)
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_A -> {
+                tvLiveInput.setText(R.string.live_cross_space)
+                handled = true
+            }
             KeyEvent.KEYCODE_BUTTON_Y -> {
-                handled = false
+                tvLiveInput.setText(R.string.live_triangle_enter)
+                handled = true
+            }
+            KeyEvent.KEYCODE_BUTTON_B -> {
+                tvLiveInput.setText(R.string.live_circle_tab)
+                handled = true
             }
             else -> handled = false
         }
 
         val btnName = when (keyCode) {
-            KeyEvent.KEYCODE_BUTTON_R1 -> "R1 [SELECT]"
-            KeyEvent.KEYCODE_BUTTON_L1 -> "L1 [BASE LAYER]"
-            KeyEvent.KEYCODE_BUTTON_X -> if (isShift) "Square [DEL (Forward)]" else "Square [BACKSPACE]"
+            KeyEvent.KEYCODE_BUTTON_R1 -> getString(R.string.btn_r1_select)
+            KeyEvent.KEYCODE_BUTTON_L1 -> getString(R.string.btn_l1_base)
+            KeyEvent.KEYCODE_BUTTON_X -> getString(if (isShift) R.string.live_square_del else R.string.live_square_backspace)
+            KeyEvent.KEYCODE_BUTTON_A -> getString(R.string.btn_cross_space)
+            KeyEvent.KEYCODE_BUTTON_Y -> getString(R.string.btn_triangle_enter)
+            KeyEvent.KEYCODE_BUTTON_B -> getString(R.string.btn_circle_tab)
             else -> KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")
         }
-        tvStatus.text = "🎮 Controller Signal Detected! (${event.device?.name ?: "Gamepad"})"
-        tvStatus.setTextColor(0xFF9ECE6A.toInt())
+        tvStatus.text = getString(R.string.status_controller_signal_detected, btnName)
+        tvStatus.setTextColor(ContextCompat.getColor(this, R.color.status_connected))
 
         if (handled) {
             refreshRadialHUD()
@@ -738,26 +783,30 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         return super.onKeyDown(keyCode, event)
     }
 
+    /**
+     * Intercepts gamepad button releases to clear active modifiers and deactivate mouse mode.
+     */
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         var handled = true
         when (keyCode) {
             KeyEvent.KEYCODE_BUTTON_L2 -> {
                 isL2ButtonDown = false
-                isShift = l2TriggerActive || leftStickShiftActive
+                engine.onKeyEvent(keyCode, isDown = false)
+                isShift = engine.isShiftActive
             }
             KeyEvent.KEYCODE_BUTTON_R2 -> {
                 isR2ButtonDown = false
                 r2TriggerActive = false
                 engine.onKeyEvent(keyCode, isDown = false)
                 VirtualMouseManager.setMouseLayerActive(this, false)
-                tvLiveInput.text = "Mouse Layer Deactivated"
+                tvLiveInput.setText(R.string.live_mouse_layer_deactivated)
                 handled = true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> isCtrl = false
             KeyEvent.KEYCODE_DPAD_LEFT -> isAlt = false
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = false
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                val prefs = getSharedPreferences("radpad_prefs", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
                 if (prefs.getString("select_button_action", "paste") == "super") {
                     isSuper = false
                 }

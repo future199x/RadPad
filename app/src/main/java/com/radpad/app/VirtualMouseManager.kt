@@ -21,28 +21,46 @@ import kotlin.math.hypot
 import kotlin.math.pow
 
 /**
- * VirtualMouseManager: Coordinates on-screen cursor position, smooth analog velocity integration,
- * overlay pointer rendering, and click dispatching via RadPadAccessibilityService.
+ * Coordinates the on-screen mouse cursor position, analog velocity integration,
+ * pointer rendering overlay, and synthetic click injection via [RadPadAccessibilityService].
+ *
+ * ## Cursor Dynamics
+ * - **Deflection Deadzone**: 0.10f threshold below which stick inputs are ignored.
+ * - **Response Curve**: Exponential response \(v \propto (\text{deflection})^{1.6}\) for pixel-precise fine aiming
+ *   near center and fast screen traversal at edge deflections.
+ * - **Frame Loop**: Smooth 60fps kinematic integration loop updating cursor position in real time.
  */
 object VirtualMouseManager {
 
+    /**
+     * Listener interface for observing virtual mouse activation, position, and click events.
+     */
     interface MouseStateListener {
+        /** Called when mouse layer transitions between active and inactive. */
         fun onMouseLayerChanged(active: Boolean)
+        /** Called whenever the cursor moves on screen. */
         fun onCursorMoved(x: Float, y: Float)
+        /** Called when a click gesture is dispatched. */
         fun onMouseClicked(button: MouseButton, x: Float, y: Float)
     }
 
+    /**
+     * Mouse button identifiers mapped to controller face buttons or D-pad hats.
+     */
     enum class MouseButton {
         LEFT, RIGHT, MIDDLE
     }
 
     private val listeners = CopyOnWriteArrayList<MouseStateListener>()
 
+    /** Whether the virtual mouse overlay and input routing are currently active. */
     var isMouseLayerActive: Boolean = false
         private set
 
+    /** Current cursor X screen coordinate in pixels. */
     var cursorX: Float = 500f
         private set
+    /** Current cursor Y screen coordinate in pixels. */
     var cursorY: Float = 800f
         private set
 
@@ -127,18 +145,14 @@ object VirtualMouseManager {
 
     private fun ensureCursorView(context: Context) {
         if (cursorView != null) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) return
+        if (!Settings.canDrawOverlays(context)) return
 
         val wm = windowManager ?: return
 
         cursorView = CursorPointerView(context.applicationContext)
 
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val layoutType =
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
 
         val density = context.resources.displayMetrics.density
         val tipOffset = 10f * density
@@ -241,6 +255,9 @@ object VirtualMouseManager {
         }
     }
 
+    /**
+     * Injects a primary left-click tap at current pointer coordinates via [RadPadAccessibilityService.dispatchTap].
+     */
     fun performLeftClick(): Boolean {
         cursorView?.triggerClickPulse(MouseButton.LEFT)
         for (l in listeners) {
@@ -249,6 +266,9 @@ object VirtualMouseManager {
         return RadPadAccessibilityService.dispatchTap(cursorX, cursorY, 50L)
     }
 
+    /**
+     * Injects a secondary right-click action (long-press tap for context menus, or global Back fallback).
+     */
     fun performRightClick(): Boolean {
         cursorView?.triggerClickPulse(MouseButton.RIGHT)
         for (l in listeners) {
@@ -262,6 +282,9 @@ object VirtualMouseManager {
         return true
     }
 
+    /**
+     * Injects a middle-click action (medium tap, or global Recents overview fallback).
+     */
     fun performMiddleClick(): Boolean {
         cursorView?.triggerClickPulse(MouseButton.MIDDLE)
         for (l in listeners) {

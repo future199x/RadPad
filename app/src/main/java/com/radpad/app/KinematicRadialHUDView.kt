@@ -9,10 +9,21 @@ import android.util.AttributeSet
 import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * KinematicRadialHUDView: Hardware-accelerated radial controller dial.
+ * Hardware-accelerated radial controller HUD view.
+ *
+ * ## Rendering Pipeline
+ * 1. **Outer Ring & Slices**: Draws circular background with 8 sectors (45° symmetric or 60°/30° asymmetric).
+ * 2. **Targeted Sector Highlight**: Draws filled arc highlight with stroke border for currently aimed sector.
+ * 3. **Dividers & Outer Ring**: Renders radial spoke dividers and outer ring stroke.
+ * 4. **Center Deadzone**: Renders inner deadzone circle (highlighted when center actions like Mute or Page Toggle are primed).
+ * 5. **Sector Labels**: Renders text glyphs positioned at azimuth angles, dynamically accounting for Shift/Caps state.
+ * 6. **Center Telemetry**: Renders active layer name, page indicator, or context hints.
+ * 7. **Targeting Reticle**: Smoothly tracks physical analog right stick position (X, Y) relative to deadzone limits.
+ * 8. **Virtual Mouse Mode**: In mouse mode, hides keyboard sectors and renders clean crosshair guidelines with mouse button hints.
  */
 class KinematicRadialHUDView @JvmOverloads constructor(
     context: Context,
@@ -37,32 +48,6 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         val SLICE_CENTER_AZIMUTHS = floatArrayOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f)
 
-        fun shiftNumberSymbol(c: String): String {
-            return when (c) {
-                "1" -> "!"
-                "2" -> "@"
-                "3" -> "#"
-                "4" -> "$"
-                "5" -> "%"
-                "6" -> "^"
-                "7" -> "&"
-                "8" -> "*"
-                "9" -> "("
-                "0" -> ")"
-                "-" -> "_"
-                "=" -> "+"
-                "[" -> "{"
-                "]" -> "}"
-                ";" -> ":"
-                "'" -> "\""
-                "," -> "<"
-                "." -> ">"
-                "/" -> "?"
-                "\\" -> "|"
-                "`" -> "~"
-                else -> c
-            }
-        }
     }
 
     var isSymmetric: Boolean = true
@@ -92,73 +77,67 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xFF141724.toInt()
+        color = 0xFF282828.toInt()
     }
 
     private val sliceDividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2f
-        color = 0xFF282C40.toInt()
+        color = 0xFF3C3836.toInt()
     }
 
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 3f
-        color = 0xFF353B55.toInt()
+        color = 0xFF504945.toInt()
     }
 
     private val activeSliceFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0x550084FF.toInt()
+        color = 0x55FE8019
     }
 
     private val activeSliceStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 4f
-        color = 0xFF00C8FF.toInt()
+        color = 0xFFFABD2F.toInt()
     }
 
     private val deadzonePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xFF1B1E2E.toInt()
+        color = 0xFF1D2021.toInt()
     }
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = 36f
-        color = 0xFFBAC2DE.toInt()
+        color = 0xFFEBDBB2.toInt()
         isFakeBoldText = true
     }
 
     private val activeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = 46f
-        color = 0xFFFFFFFF.toInt()
+        color = 0xFFFBF1C7.toInt()
         isFakeBoldText = true
     }
 
     private val centerInfoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = 22f
-        color = 0xFF7AA2F7.toInt()
+        color = 0xFFFE8019.toInt()
         isFakeBoldText = true
-    }
-
-    private val centerSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        textSize = 14f
-        color = 0xFF9AA5CE.toInt()
     }
 
     private val reticlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = 0xFF00F0FF.toInt()
+        color = 0xFFB8BB26.toInt()
     }
 
     private val reticleRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 3f
-        color = 0xAA00F0FF.toInt()
+        color = 0xAAB8BB26.toInt()
     }
 
     init {
@@ -172,6 +151,9 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         })
     }
 
+    /**
+     * Updates paint colors from the given [ThemeManager.ColorScheme] and requests a redraw.
+     */
     fun applyColorScheme(theme: ThemeManager.ColorScheme) {
         bgPaint.color = theme.dialBackground
         deadzonePaint.color = theme.deadzoneBackground
@@ -182,12 +164,15 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         textPaint.color = theme.inactiveText
         activeTextPaint.color = theme.activeText
         centerInfoPaint.color = theme.centerInfoText
-        centerSubPaint.color = theme.inactiveText
         reticlePaint.color = theme.reticleDot
         reticleRingPaint.color = theme.reticleRing
         invalidate()
     }
 
+    /**
+     * Updates the dial with latest controller stick position, active layer, and modifier flags.
+     * Re-evaluates deadzone hysteresis and schedules a repaint.
+     */
     fun updateState(
         x: Float,
         y: Float,
@@ -230,6 +215,9 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * Resolves the sector index 0..7 for given stick deflection coordinates (X, Y).
+     */
     private fun calculateSlice(x: Float, y: Float): Int {
         val rad = atan2(x.toDouble(), -y.toDouble())
         var deg = Math.toDegrees(rad).toFloat()
@@ -237,7 +225,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         return if (isSymmetric) {
             when {
-                deg >= 337.5f || deg < 22.5f -> 0
+                deg !in 22.5f..<337.5f -> 0
                 deg < 67.5f -> 1
                 deg < 112.5f -> 2
                 deg < 157.5f -> 3
@@ -248,7 +236,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
             }
         } else {
             when {
-                deg >= 330f || deg < 30f -> 0
+                deg !in 30f..<330f -> 0
                 deg < 60f -> 1
                 deg < 120f -> 2
                 deg < 150f -> 3
@@ -260,6 +248,9 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Computes the 8 sector labels to display for the [currentLayer] given [effectiveShift].
+     */
     private fun getSliceLabels(effectiveShift: Boolean): Array<String> {
         return when (currentLayer) {
             InputEngine.Layer.BASE -> BASE_PREVIEW_LABELS
@@ -333,7 +324,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         val h = height.toFloat()
         val centerX = w / 2f
         val centerY = h / 2f
-        val radius = (Math.min(w, h) / 2f) * 0.95f
+        val radius = (min(w, h) / 2f) * 0.95f
         val deadzoneRadius = radius * DEADZONE_ENGAGE
 
         outerRect.set(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
@@ -349,27 +340,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         // Check if Mouse Layer is active: Do NOT show keyboard layer wedges, dividers, or characters!
         if (VirtualMouseManager.isMouseLayerActive) {
-            canvas.drawCircle(centerX, centerY, radius, bgPaint)
-            canvas.drawCircle(centerX, centerY, radius, ringPaint)
-            canvas.drawCircle(centerX, centerY, radius * 0.65f, sliceDividerPaint)
-            canvas.drawCircle(centerX, centerY, deadzoneRadius, deadzonePaint)
-            canvas.drawCircle(centerX, centerY, deadzoneRadius, ringPaint)
-
-            // Crosshair guidelines
-            canvas.drawLine(centerX - radius * 0.45f, centerY, centerX + radius * 0.45f, centerY, sliceDividerPaint)
-            canvas.drawLine(centerX, centerY - radius * 0.45f, centerX, centerY + radius * 0.45f, sliceDividerPaint)
-
-            // Center Mouse Mode text
-            centerInfoPaint.textSize = radius * 0.14f
-            centerSubPaint.textSize = radius * 0.085f
-            canvas.drawText("🐭 MOUSE", centerX, centerY - (radius * 0.05f), activeTextPaint.apply { textSize = radius * 0.14f })
-            canvas.drawText("← L | → R | ↑ MID", centerX, centerY + (radius * 0.12f), centerSubPaint)
-
-            // Analog stick position dot (reticle)
-            val stickPixelX = centerX + (stickX * radius * 0.85f)
-            val stickPixelY = centerY + (stickY * radius * 0.85f)
-            canvas.drawCircle(stickPixelX, stickPixelY, 14f, reticleRingPaint)
-            canvas.drawCircle(stickPixelX, stickPixelY, 7f, reticlePaint)
+            drawMouseMode(canvas, centerX, centerY, radius, deadzoneRadius)
             return
         }
 
@@ -429,10 +400,24 @@ class KinematicRadialHUDView @JvmOverloads constructor(
             val textY = centerY + (labelRadius * sin(azimuthRad)).toFloat()
 
             val paint = if (i == targetedSlice) activeTextPaint else textPaint
-            if (charText.length >= 3) {
-                paint.textSize = if (i == targetedSlice) radius * 0.20f else radius * 0.16f
+
+            // Dynamically scale text size to ensure text never exceeds sector slice boundaries
+            val maxAllowedWidth = if (isSymmetric) {
+                radius * 0.38f
             } else {
-                paint.textSize = if (i == targetedSlice) radius * 0.32f else radius * 0.25f
+                if (i % 2 == 1) radius * 0.25f else radius * 0.48f
+            }
+
+            val initialTextSize = when {
+                charText.length == 1 -> if (i == targetedSlice) radius * 0.26f else radius * 0.22f
+                charText.length <= 3 -> if (i == targetedSlice) radius * 0.17f else radius * 0.14f
+                else -> if (i == targetedSlice) radius * 0.13f else radius * 0.11f
+            }
+
+            paint.textSize = initialTextSize
+            val measuredWidth = paint.measureText(charText)
+            if (measuredWidth > maxAllowedWidth && measuredWidth > 0f) {
+                paint.textSize = initialTextSize * (maxAllowedWidth / measuredWidth)
             }
 
             val verticalOffset = (paint.descent() + paint.ascent()) / 2f
@@ -440,72 +425,7 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         }
 
         // 7. Draw center status indicator & layer telemetry
-        centerInfoPaint.textSize = radius * 0.13f
-        centerSubPaint.textSize = radius * 0.08f
-
-        when (currentLayer) {
-            InputEngine.Layer.BASE -> {
-                val hoverPreview = when (targetedSlice) {
-                    0 -> "A - H"
-                    1 -> "MORE SYM"
-                    2 -> "I - P"
-                    3 -> "FN (1-12)"
-                    4 -> "Q - Z"
-                    5 -> "MACRO"
-                    6 -> "NUMBERS"
-                    7 -> "SYSTEM"
-                    else -> "RADPAD"
-                }
-                val subText = if (targetedSlice != -1) "R1: SELECT" else "AIM + R1"
-                canvas.drawText(hoverPreview, centerX, centerY - (radius * 0.04f), centerInfoPaint)
-                canvas.drawText(subText, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.SYS -> {
-                val title = if (isSysDeadzoneTargeted) "▶ MUTE ◀" else "VOL TOGGLE"
-                val sub = if (isSysDeadzoneTargeted) "R1: TOGGLE" else "L1: BASE"
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isSysDeadzoneTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
-                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.Q_Z -> {
-                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ Q - X ◀" else "▶ Y - Z ◀") else (if (isSecondLayer) "Y - Z (2/2)" else "Q - X (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
-                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.MORE_SYM -> {
-                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ SYM 1 ◀" else "▶ SYM 2 ◀") else (if (isSecondLayer) "SYM 2 (2/2)" else "SYM 1 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
-                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.NUM_SYM -> {
-                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ 1 - 8 ◀" else "▶ 9 - 0 ◀") else (if (isSecondLayer) "9 - 0 (2/2)" else "1 - 8 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
-                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.FN -> {
-                val title = if (isPageToggleTargeted) (if (isSecondLayer) "▶ FN 1-8 ◀" else "▶ FN 9-12 ◀") else (if (isSecondLayer) "FN 9-12 (2/2)" else "FN 1-8 (1/2)")
-                val sub = if (isPageToggleTargeted) "R1: TOGGLE" else (if (isSecondLayer) "L1: PAGE 1" else "L1: BASE")
-                canvas.drawText(title, centerX, centerY - (radius * 0.04f), if (isPageToggleTargeted) activeTextPaint.apply { textSize = radius * 0.12f } else centerInfoPaint)
-                canvas.drawText(sub, centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            InputEngine.Layer.MACRO -> {
-                canvas.drawText("MACROS", centerX, centerY - (radius * 0.04f), centerInfoPaint)
-                canvas.drawText("L1: BASE", centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-
-            else -> {
-                canvas.drawText(currentLayer.displayName, centerX, centerY - (radius * 0.04f), centerInfoPaint)
-                canvas.drawText("L1: BASE", centerX, centerY + (radius * 0.12f), centerSubPaint)
-            }
-        }
+        drawCenterStatus(canvas, centerX, centerY, radius, isSysDeadzoneTargeted, isPageToggleTargeted)
 
         // 8. Draw physical analog stick position dot (targeting reticle)
         val stickPixelX = centerX + (stickX * radius * 0.85f)
@@ -513,5 +433,96 @@ class KinematicRadialHUDView @JvmOverloads constructor(
 
         canvas.drawCircle(stickPixelX, stickPixelY, 14f, reticleRingPaint)
         canvas.drawCircle(stickPixelX, stickPixelY, 7f, reticlePaint)
+    }
+
+    /**
+     * Renders virtual mouse overlay inside the dial with guideline crosshairs and click hints.
+     */
+    private fun drawMouseMode(
+        canvas: Canvas,
+        centerX: Float,
+        centerY: Float,
+        radius: Float,
+        deadzoneRadius: Float
+    ) {
+        canvas.drawCircle(centerX, centerY, radius, bgPaint)
+        canvas.drawCircle(centerX, centerY, radius, ringPaint)
+        canvas.drawCircle(centerX, centerY, deadzoneRadius, deadzonePaint)
+        canvas.drawCircle(centerX, centerY, deadzoneRadius, ringPaint)
+
+        // Center Mouse Mode text
+        activeTextPaint.textSize = radius * 0.17f
+        val title = "MOUSE"
+        val vOffset = (activeTextPaint.descent() + activeTextPaint.ascent()) / 2f
+        canvas.drawText(title, centerX, centerY - vOffset, activeTextPaint)
+
+        // Analog stick position dot (reticle)
+        val stickPixelX = centerX + (stickX * radius * 0.85f)
+        val stickPixelY = centerY + (stickY * radius * 0.85f)
+        canvas.drawCircle(stickPixelX, stickPixelY, 14f, reticleRingPaint)
+        canvas.drawCircle(stickPixelX, stickPixelY, 7f, reticlePaint)
+    }
+
+    /**
+     * Renders center circle telemetry indicating active layer name, page number, or context hints.
+     */
+    private fun drawCenterStatus(
+        canvas: Canvas,
+        centerX: Float,
+        centerY: Float,
+        radius: Float,
+        isSysDeadzoneTargeted: Boolean,
+        isPageToggleTargeted: Boolean
+    ) {
+        val maxCenterWidth = radius * DEADZONE_ENGAGE * 1.6f
+
+        val (title, titlePaint) = when (currentLayer) {
+            InputEngine.Layer.BASE -> {
+                val hoverPreview = when (targetedSlice) {
+                    0 -> "A - H"
+                    1 -> "SYMBOLS"
+                    2 -> "I - P"
+                    3 -> "FN"
+                    4 -> "Q - Z"
+                    5 -> "MACRO"
+                    6 -> "NUMBERS"
+                    7 -> "SYSTEM"
+                    else -> "RADPAD"
+                }
+                Pair(hoverPreview, centerInfoPaint)
+            }
+            InputEngine.Layer.SYS -> {
+                val t = if (isSysDeadzoneTargeted) "▶ MUTE ◀" else "SYSTEM"
+                Pair(t, if (isSysDeadzoneTargeted) activeTextPaint else centerInfoPaint)
+            }
+            InputEngine.Layer.Q_Z -> {
+                val t = if (isPageToggleTargeted) (if (isSecondLayer) "▶ Q - X ◀" else "▶ Y - Z ◀") else (if (isSecondLayer) "Y - Z" else "Q - X")
+                Pair(t, if (isPageToggleTargeted) activeTextPaint else centerInfoPaint)
+            }
+            InputEngine.Layer.MORE_SYM -> {
+                val t = if (isPageToggleTargeted) (if (isSecondLayer) "▶ SYM 1 ◀" else "▶ SYM 2 ◀") else (if (isSecondLayer) "SYM 2" else "SYM 1")
+                Pair(t, if (isPageToggleTargeted) activeTextPaint else centerInfoPaint)
+            }
+            InputEngine.Layer.NUM_SYM -> {
+                val t = if (isPageToggleTargeted) (if (isSecondLayer) "▶ 1 - 8 ◀" else "▶ 9 - 0 ◀") else (if (isSecondLayer) "9 - 0" else "1 - 8")
+                Pair(t, if (isPageToggleTargeted) activeTextPaint else centerInfoPaint)
+            }
+            InputEngine.Layer.FN -> {
+                val t = if (isPageToggleTargeted) (if (isSecondLayer) "▶ FN 1-8 ◀" else "▶ FN 9-12 ◀") else (if (isSecondLayer) "FN 9-12" else "FN 1-8")
+                Pair(t, if (isPageToggleTargeted) activeTextPaint else centerInfoPaint)
+            }
+            InputEngine.Layer.MACRO -> Pair("MACROS", centerInfoPaint)
+            else -> Pair(currentLayer.displayName, centerInfoPaint)
+        }
+
+        // Auto-fit title inside center deadzone circle and center perfectly
+        val initialTitleSize = if (titlePaint === activeTextPaint) radius * 0.16f else radius * 0.17f
+        titlePaint.textSize = initialTitleSize
+        val measuredTitleW = titlePaint.measureText(title)
+        if (measuredTitleW > maxCenterWidth && measuredTitleW > 0f) {
+            titlePaint.textSize = initialTitleSize * (maxCenterWidth / measuredTitleW)
+        }
+        val vOffset = (titlePaint.descent() + titlePaint.ascent()) / 2f
+        canvas.drawText(title, centerX, centerY - vOffset, titlePaint)
     }
 }

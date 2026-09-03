@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base RadPad Dark Theme -->
+    <style name="Theme.RadPad" parent="Theme.MaterialComponents.NoActionBar">
+        <!-- Palette Colors -->
+        <item name="colorPrimary">@color/accent_primary</item>
+        <item name="colorPrimaryVariant">@color/surface_elevated</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/accent_info</item>
+        <item name="colorSecondaryVariant">@color/surface_secondary</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorError">@color/accent_danger</item>
+        <item name="colorOnError">@android:color/white</item>
+
+        <!-- Window & Background Defaults -->
+        <item name="android:windowBackground">@color/surface_primary</item>
+        <item name="android:colorBackground">@color/surface_primary</item>
+
+        <!-- Text Colors (Guarantees bright text across all views, popups, and widgets) -->
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorTertiary">@color/text_tertiary</item>
+        <item name="android:textColorHint">@color/text_muted</item>
+        <item name="android:editTextColor">@color/text_primary</item>
+
+        <!-- Spinner Item Styles -->
+        <item name="android:spinnerItemStyle">@style/Widget.RadPad.SpinnerItem</item>
+        <item name="android:spinnerDropDownItemStyle">@style/Widget.RadPad.SpinnerDropDownItem</item>
+
+        <!-- Dialog Theme -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.RadPad.Dialog</item>
+    </style>
+
+    <!-- Default Spinner Item Style (Collapsed View) -->
+    <style name="Widget.RadPad.SpinnerItem" parent="Widget.AppCompat.TextView.SpinnerItem">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <!-- Default Spinner Dropdown Item Style (Expanded List) -->
+    <style name="Widget.RadPad.SpinnerDropDownItem" parent="Widget.AppCompat.DropDownItem.Spinner">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:background">@color/surface_card</item>
+    </style>
+
+    <!-- Dark Material Dialog Theme -->
+    <style name="ThemeOverlay.RadPad.Dialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:colorBackground">@color/surface_card</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.RadPad.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.RadPad.DialogButton</item>
+    </style>
+
+    <!-- Dialog Button Style -->
+    <style name="Widget.RadPad.DialogButton" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textColor">@color/accent_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>
