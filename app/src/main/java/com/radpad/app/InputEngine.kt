@@ -42,7 +42,8 @@ class InputEngine {
             }
         }
 
-        const val FLAG_R2_HOLD: Int = 1 shl 1   // Right Trigger (R2) -> Second Layer Hold
+        const val FLAG_R2_HOLD: Int = 1 shl 1   // Right Trigger (R2) -> Mouse Layer Hold
+        const val FLAG_MOUSE_LAYER: Int = FLAG_R2_HOLD
         const val FLAG_SHIFT: Int = 1 shl 2     // Shift (Left Trigger L2): Hold to uppercase
         const val FLAG_CTRL: Int = 1 shl 3      // Ctrl (Left Stick Down / Tilt)
         const val FLAG_ALT: Int = 1 shl 4       // Alt (Left Stick Left / Tilt)
@@ -204,13 +205,12 @@ class InputEngine {
 
     var isSecondLayerActive: Boolean
         get() {
-            val isR2Active = isR2ButtonDown || r2TriggerActive
             if (isNativeLoaded) {
                 try {
-                    return isSecondPage() || isR2Active
+                    return isSecondPage()
                 } catch (_: UnsatisfiedLinkError) {}
             }
-            return fallbackSecondPage || isR2Active
+            return fallbackSecondPage
         }
         set(value) {
             fallbackSecondPage = value
@@ -220,6 +220,9 @@ class InputEngine {
                 } catch (_: UnsatisfiedLinkError) {}
             }
         }
+
+    val isMouseLayerActive: Boolean
+        get() = isR2ButtonDown || r2TriggerActive
 
     var lastStickX: Float = 0f
         private set

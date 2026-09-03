@@ -189,19 +189,17 @@ class InputEngineTest {
     }
 
     @Test
-    fun testSecondaryLayerHold() {
+    fun testMouseLayerHoldOnR2() {
         val engine = InputEngine()
-        engine.setLayer(InputEngine.Layer.NUM_SYM)
-
-        assertFalse(engine.isSecondLayerActive)
+        assertFalse(engine.isMouseLayerActive)
 
         // Hold R2
         engine.onKeyEvent(KeyEvent.KEYCODE_BUTTON_R2, isDown = true)
-        assertTrue(engine.isSecondLayerActive)
+        assertTrue(engine.isMouseLayerActive)
 
         // Release R2
         engine.onKeyEvent(KeyEvent.KEYCODE_BUTTON_R2, isDown = false)
-        assertFalse(engine.isSecondLayerActive)
+        assertFalse(engine.isMouseLayerActive)
     }
 
     @Test

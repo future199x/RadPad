@@ -6,4 +6,6 @@
     <string name="hud_status_ready">Ready • Aim Stick + R1 to Select</string>
     <string name="hud_zone_prefix">Zone: </string>
     <string name="hud_mods_prefix">Modifiers: </string>
+    <string name="accessibility_service_label">RadPad Virtual Mouse Click Service</string>
+    <string name="accessibility_service_description">Enables RadPad to dispatch system-wide mouse clicks when holding R2.</string>
 </resources>

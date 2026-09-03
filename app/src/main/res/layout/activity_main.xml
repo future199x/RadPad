@@ -229,6 +229,62 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
+        <!-- Virtual Mouse Layer Settings Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#1B1D2E"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🐭 Virtual Mouse Layer (Hold R2)"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Hold R2 to steer cursor with Right Stick. D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click."
+                android:textColor="#888B9E"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tv_accessibility_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="System Clicks: Checking..."
+                    android:textColor="#F38BA8"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_enable_accessibility"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#7AA2F7"
+                    android:paddingHorizontal="12dp"
+                    android:text="Enable Clicks"
+                    android:textAllCaps="false"
+                    android:textColor="#0F101A"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Macro Layer Settings Card -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -723,7 +779,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• Right Stick: Aim and target radial sectors (no accidental flick typing)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select &amp; Start: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)\n• Options / Start: Configurable in Settings"
+                android:text="• Right Stick: Aim radial sectors (or move mouse cursor when holding R2)\n• Hold R2: Mouse Layer (Right Stick = Move Cursor, D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select &amp; Start: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)"
                 android:textColor="#C0CAF5"
                 android:textSize="12sp" />
         </LinearLayout>

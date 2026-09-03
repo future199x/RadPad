@@ -3,7 +3,8 @@ const std = @import("std");
 // ============================================================================
 // BITMASK CONSTANTS: HARDWARE CONTROLLER INPUTS (passed from Kotlin layer)
 // ============================================================================
-pub const FLAG_R2_HOLD: i32 = 1 << 1;   // Right Trigger (R2) -> Second Layer Hold
+pub const FLAG_R2_HOLD: i32 = 1 << 1;   // Right Trigger (R2) -> Mouse Layer Hold
+pub const FLAG_MOUSE_LAYER: i32 = FLAG_R2_HOLD;
 pub const FLAG_SHIFT: i32 = 1 << 2;     // Left Trigger (L2) -> SHIFT (Hold to uppercase / symbols)
 pub const FLAG_CTRL: i32 = 1 << 3;      // Ctrl (Left Stick Down / Tilt)
 pub const FLAG_ALT: i32 = 1 << 4;       // Alt (Left Stick Left / Tilt)
@@ -285,9 +286,12 @@ pub const InputStateMachine = struct {
             return 0;
         }
 
+        // When R2 is held, we are in mouse layer - do not emit keyboard characters!
+        if ((state_flags & FLAG_R2_HOLD) != 0) return 0;
+
         // Stick is deflected into a slice:
         const slice_idx: usize = @intFromEnum(self.last_aimed_slice);
-        const is_second_layer = self.is_second_page or ((state_flags & FLAG_R2_HOLD) != 0);
+        const is_second_layer = self.is_second_page;
 
         var char_code: u16 = switch (self.current_layer) {
             .A_H => LAYOUT_A_H[slice_idx],
@@ -534,9 +538,9 @@ test "Q-Z layer: q..x on Page 1, y..z on Page 2 via center R1 toggle and R2 hold
     const out_q2 = engine.process(0.0, -0.8, FLAG_SELECT);
     try std.testing.expectEqual(@as(i32, 'q'), out_q2 & 0xFF);
 
-    // While on Page 1, holding R2 temporarily gives 'y'
-    const out_y_r2 = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
-    try std.testing.expectEqual(@as(i32, 'y'), out_y_r2 & 0xFF);
+    // While on Page 1, holding R2 puts into mouse layer (no character emitted on select)
+    const out_mouse = engine.process(0.0, -0.8, FLAG_SELECT | FLAG_R2_HOLD);
+    try std.testing.expectEqual(@as(i32, 0), out_mouse);
 }
 
 test "MACRO layer emits KEY_MACRO_0..KEY_MACRO_7" {

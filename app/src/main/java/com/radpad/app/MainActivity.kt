@@ -170,6 +170,10 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         inputManager?.registerInputDeviceListener(this, null)
         FloatingHUDManager.register(this)
 
+        findViewById<Button>(R.id.btn_enable_accessibility)?.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+
         detectConnectedControllers()
         refreshRadialHUD()
     }
@@ -380,6 +384,20 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
     override fun onResume() {
         super.onResume()
         updateFloatingButtonState()
+        refreshRadialHUD()
+        refreshMacroSpinners()
+
+        val tvAccessibility = findViewById<TextView>(R.id.tv_accessibility_status)
+        val btnAccessibility = findViewById<Button>(R.id.btn_enable_accessibility)
+        if (RadPadAccessibilityService.isEnabled) {
+            tvAccessibility?.text = "✓ System Clicks: Enabled"
+            tvAccessibility?.setTextColor(0xFFA6E3A1.toInt())
+            btnAccessibility?.text = "Configured"
+        } else {
+            tvAccessibility?.text = "⚠️ System Clicks: Disabled"
+            tvAccessibility?.setTextColor(0xFFF38BA8.toInt())
+            btnAccessibility?.text = "Enable Clicks"
+        }
     }
 
     override fun onDestroy() {
@@ -527,8 +545,55 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
         l2TriggerActive = if (l2TriggerActive) l2Val >= 0.25f else l2Val >= 0.5f
         r2TriggerActive = if (r2TriggerActive) r2Val >= 0.25f else r2Val >= 0.5f
 
+        val isMouseActive = isR2ButtonDown || r2TriggerActive
+        val wasMouseActive = VirtualMouseManager.isMouseLayerActive
+        if (wasMouseActive != isMouseActive) {
+            VirtualMouseManager.setMouseLayerActive(this, isMouseActive)
+        }
+
+        if (isMouseActive) {
+            VirtualMouseManager.updateStick(currentX, currentY)
+
+            if (hatX != lastHatX) {
+                if (hatX < -0.5f) {
+                    VirtualMouseManager.performLeftClick()
+                    tvLiveInput.text = "Mouse: Left Click"
+                } else if (hatX > 0.5f) {
+                    VirtualMouseManager.performRightClick()
+                    tvLiveInput.text = "Mouse: Right Click"
+                }
+                lastHatX = hatX
+            }
+
+            if (hatY != lastHatY) {
+                if (hatY < -0.5f) {
+                    VirtualMouseManager.performMiddleClick()
+                    tvLiveInput.text = "Mouse: Middle Click"
+                }
+                lastHatY = hatY
+            }
+
+            tvStatus.text = "🐭 Mouse Layer Active (Right Stick: Move | D-Pad: Click)"
+            tvStatus.setTextColor(0xFF89B4FA.toInt())
+            tvLiveInput.text = String.format("Mouse Cursor: (%.0f, %.0f) | Stick: (%+.2f, %+.2f)", VirtualMouseManager.cursorX, VirtualMouseManager.cursorY, currentX, currentY)
+            refreshRadialHUD()
+            return true
+        }
+
+        if (hatX != lastHatX) {
+            if (hatX < -0.5f) onDpadAction("← Left")
+            else if (hatX > 0.5f) onDpadAction("→ Right")
+            lastHatX = hatX
+        }
+
+        if (hatY != lastHatY) {
+            if (hatY < -0.5f) onDpadAction("↑ Up")
+            else if (hatY > 0.5f) onDpadAction("↓ Down")
+            lastHatY = hatY
+        }
+
         isShift = isL2ButtonDown || l2TriggerActive || leftStickShiftActive
-        isSecondLayer = isR2ButtonDown || r2TriggerActive
+        isSecondLayer = engine.isSecondLayerActive
 
         engine.onMotionEvent(event)
 
@@ -585,8 +650,11 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             }
             KeyEvent.KEYCODE_BUTTON_R2 -> {
                 isR2ButtonDown = true
-                isSecondLayer = true
-                engine.onKeyEvent(keyCode, isDown = true)
+                VirtualMouseManager.setMouseLayerActive(this, true)
+                tvStatus.text = "🐭 Mouse Layer Active (Right Stick: Move | D-Pad: Click)"
+                tvStatus.setTextColor(0xFF89B4FA.toInt())
+                tvLiveInput.text = "Mouse Layer Activated"
+                handled = true
             }
             KeyEvent.KEYCODE_BUTTON_THUMBL -> isCaps = !isCaps
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
@@ -602,9 +670,33 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
                 executeSystemButtonAction("Start", action)
                 handled = true
             }
-            KeyEvent.KEYCODE_DPAD_LEFT -> onDpadAction("← Left")
-            KeyEvent.KEYCODE_DPAD_RIGHT -> onDpadAction("→ Right")
-            KeyEvent.KEYCODE_DPAD_UP -> onDpadAction("↑ Up")
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.performLeftClick()
+                    tvLiveInput.text = "Mouse: Left Click"
+                    handled = true
+                } else {
+                    onDpadAction("← Left")
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.performRightClick()
+                    tvLiveInput.text = "Mouse: Right Click"
+                    handled = true
+                } else {
+                    onDpadAction("→ Right")
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.performMiddleClick()
+                    tvLiveInput.text = "Mouse: Middle Click"
+                    handled = true
+                } else {
+                    onDpadAction("↑ Up")
+                }
+            }
             KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction("↓ Down")
             KeyEvent.KEYCODE_BUTTON_A,
             KeyEvent.KEYCODE_BUTTON_B,
@@ -640,8 +732,9 @@ class MainActivity : Activity(), InputManager.InputDeviceListener, ThemeManager.
             }
             KeyEvent.KEYCODE_BUTTON_R2 -> {
                 isR2ButtonDown = false
-                isSecondLayer = r2TriggerActive
-                engine.onKeyEvent(keyCode, isDown = false)
+                VirtualMouseManager.setMouseLayerActive(this, false)
+                tvLiveInput.text = "Mouse Layer Deactivated"
+                handled = true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> isCtrl = false
             KeyEvent.KEYCODE_DPAD_LEFT -> isAlt = false

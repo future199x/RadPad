@@ -417,7 +417,10 @@ class KinematicRadialHUDView @JvmOverloads constructor(
         centerInfoPaint.textSize = radius * 0.13f
         centerSubPaint.textSize = radius * 0.08f
 
-        when (currentLayer) {
+        if (VirtualMouseManager.isMouseLayerActive) {
+            canvas.drawText("🐭 MOUSE", centerX, centerY - (radius * 0.04f), activeTextPaint.apply { textSize = radius * 0.12f })
+            canvas.drawText("D-PAD: CLICKS", centerX, centerY + (radius * 0.12f), centerSubPaint)
+        } else when (currentLayer) {
             InputEngine.Layer.BASE -> {
                 val hoverPreview = when (targetedSlice) {
                     0 -> "A - H"

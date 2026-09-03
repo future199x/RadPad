@@ -87,9 +87,42 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         lastStickX = rx
         lastStickY = ry
 
+        // Check if R2 trigger engaged
+        val wasMouseActive = VirtualMouseManager.isMouseLayerActive
+        val isMouseActive = engine.isMouseLayerActive
+        if (wasMouseActive != isMouseActive) {
+            VirtualMouseManager.setMouseLayerActive(this, isMouseActive)
+        }
+
         // D-Pad Hat Navigation
         val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+
+        if (engine.isMouseLayerActive) {
+            VirtualMouseManager.updateStick(rx, ry)
+
+            if (hatX != lastHatX) {
+                if (hatX < -0.5f) {
+                    VirtualMouseManager.performLeftClick()
+                    hudStatus?.text = "Mouse: Left Click"
+                } else if (hatX > 0.5f) {
+                    VirtualMouseManager.performRightClick()
+                    hudStatus?.text = "Mouse: Right Click"
+                }
+                lastHatX = hatX
+            }
+
+            if (hatY != lastHatY) {
+                if (hatY < -0.5f) {
+                    VirtualMouseManager.performMiddleClick()
+                    hudStatus?.text = "Mouse: Middle Click"
+                }
+                lastHatY = hatY
+            }
+
+            updateHud(lastEvent = null, x = rx, y = ry)
+            return true
+        }
 
         if (hatX != lastHatX) {
             if (hatX < -0.5f) handleDpadNavigation(KeyEvent.KEYCODE_DPAD_LEFT)
@@ -137,6 +170,35 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        // 0. Mouse Layer check:
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
+            engine.onKeyEvent(keyCode, isDown = true)
+            VirtualMouseManager.setMouseLayerActive(this, true)
+            hudStatus?.text = "🐭 MOUSE LAYER (Aim Stick: Move | D-Pad: Clicks)"
+            updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+            return true
+        }
+
+        if (engine.isMouseLayerActive) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    VirtualMouseManager.performLeftClick()
+                    hudStatus?.text = "Mouse: Left Click"
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    VirtualMouseManager.performRightClick()
+                    hudStatus?.text = "Mouse: Right Click"
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    VirtualMouseManager.performMiddleClick()
+                    hudStatus?.text = "Mouse: Middle Click"
+                    return true
+                }
+            }
+        }
+
         // 1. Right Bumper (R1): SELECTION
         if (keyCode == KeyEvent.KEYCODE_BUTTON_R1) {
             val result = engine.onSelect()
@@ -333,6 +395,12 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
+            engine.onKeyEvent(keyCode, isDown = false)
+            VirtualMouseManager.setMouseLayerActive(this, false)
+            updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+            return true
+        }
         val handled = engine.onKeyEvent(keyCode, isDown = false)
         updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
         if (handled) return true
@@ -382,7 +450,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         val layer = engine.currentLayer
         val isSecond = engine.isSecondLayerActive
 
-        val zoneLabel = when (layer) {
+        val isMouse = engine.isMouseLayerActive
+        val zoneLabel = if (isMouse) {
+            "🐭 MOUSE LAYER"
+        } else when (layer) {
             InputEngine.Layer.BASE -> "BASE LAYER"
             InputEngine.Layer.MORE_SYM -> if (isSecond) "SYM 2" else "SYM 1"
             InputEngine.Layer.NUM_SYM -> if (isSecond) "NUM (9-0)" else "NUM (1-8)"
@@ -400,6 +471,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         val isCaps = (mask and InputEngine.FLAG_CAPS_LOCK) != 0
 
         val activeMods = mutableListOf<String>()
+        if (isMouse) activeMods.add("MOUSE")
         if (isCaps) activeMods.add("CAPS")
         if (isShift) activeMods.add("SHIFT")
         if (isCtrl) activeMods.add("CTRL")
@@ -410,7 +482,9 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
         val modText = if (activeMods.isEmpty()) "MODS: NONE" else "MODS: " + activeMods.joinToString("+")
         hudModifiers?.text = modText
 
-        if (lastEvent != null) {
+        if (isMouse) {
+            hudStatus?.text = "D-Pad: ← Left Click | → Right Click | ↑ Mid Click"
+        } else if (lastEvent != null) {
             val displayChar = when {
                 lastEvent.charCode in InputEngine.KEY_MACRO_0..InputEngine.KEY_MACRO_7 -> {
                     val slot = lastEvent.charCode - InputEngine.KEY_MACRO_0
