@@ -30,6 +30,7 @@ Instead of struggling with a touchscreen keyboard or awkward on-screen letter gr
   - **Fluid Click Ripple Animation**: Modern multi-ripple expanding wave animations with smooth energy dissipation and ample bounds padding so click circles never clip against window edges.
 - **Dedicated Start & System Controls**:
   - **Start / Options Button**: Emits **Escape (ESC)** by default (customizable in Settings to Hide Keyboard or Toggle HUD).
+  - **Select / Share Button**: Toggles the always-on Floating HUD and hides the soft keyboard by default (`Toggle HUD + Hide Keyboard`, customizable in Settings).
   - **R3 (Right Stick Click)**: Triggers Middle Click in Mouse Mode, and safely no-ops outside Mouse Mode.
 - **Custom Macro Engine**:
   - 8 configurable radial macro slots with presets (Copy, Paste, Cut, Select All, Undo, Redo, Win+D, Alt+Tab, Task Manager) plus full custom support for complex keyboard combinations (`ctrl+shift+z`, `win+shift+s`, `alt+f4`) and arbitrary text injection (`text:hello`).
@@ -68,7 +69,7 @@ Instead of struggling with a touchscreen keyboard or awkward on-screen letter gr
 | **D-Pad Up** | **Cursor Up / Scroll Up** | Moves text cursor up; Smooth vertical scroll up in mouse mode |
 | **D-Pad Down** | **Cursor Down / Scroll Down** | Moves text cursor down; Smooth vertical scroll down in mouse mode |
 | **Start / Options** | **Escape (ESC) (Default)** | Emits Escape key (customizable in Settings: Escape, Hide Keyboard, Toggle HUD) |
-| **Select / Share** | **Configurable Action** | Toggle HUD (Default), Hide Keyboard, Toggle HUD + Hide Keyboard, or Escape |
+| **Select / Share** | **Toggle HUD + Hide Keyboard (Default)** | Toggles always-on floating HUD and hides soft keyboard (customizable in Settings: Toggle HUD + Hide Keyboard, Toggle HUD, Hide Keyboard, Escape) |
 
 ---
 

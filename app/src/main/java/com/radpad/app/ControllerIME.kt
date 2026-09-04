@@ -334,7 +334,7 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
             // Share / Select Button
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
+                val action = prefs.getString("select_button_action", "toggle_hud_hide_keyboard") ?: "toggle_hud_hide_keyboard"
                 executeSystemButtonAction(action)
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
@@ -400,7 +400,8 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 requestHideSelf(0)
             }
             "toggle_hud_hide_keyboard" -> {
-                FloatingHUDManager.toggleFloater(this)
+                val isShown = FloatingHUDManager.toggleFloater(this)
+                hudStatus?.setText(if (isShown) R.string.hud_overlay_visible else R.string.hud_overlay_hidden)
                 requestHideSelf(0)
             }
             else -> { // "toggle_hud"

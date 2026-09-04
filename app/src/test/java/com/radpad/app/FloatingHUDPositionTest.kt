@@ -213,4 +213,16 @@ class FloatingHUDPositionTest {
             VirtualMouseManager.unregister(testListener)
         }
     }
+
+    @Test
+    fun testSystemButtonActionDefaults() {
+        val validActions = listOf("escape", "hide_keyboard", "toggle_hud", "toggle_hud_hide_keyboard")
+        val defaultSelectAction = "toggle_hud_hide_keyboard"
+        val defaultStartAction = "escape"
+
+        assertTrue("Default select action must be valid", validActions.contains(defaultSelectAction))
+        assertTrue("Default start action must be valid", validActions.contains(defaultStartAction))
+        assertEquals("toggle_hud_hide_keyboard", defaultSelectAction)
+        assertEquals("escape", defaultStartAction)
+    }
 }

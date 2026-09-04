@@ -37,7 +37,8 @@
 
     <!-- Action Buttons -->
     <color name="button_step1">#D65D0E</color>
-    <color name="button_step2">#504945</color>
+    <color name="button_step2">#458588</color>
+    <color name="button_step3">#504945</color>
     <color name="button_launch">#79740E</color>
     <color name="button_danger">#CC241D</color>
 </resources>

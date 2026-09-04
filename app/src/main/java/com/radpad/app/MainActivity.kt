@@ -35,7 +35,7 @@ import java.util.Locale
  * ## Responsibilities
  * - **Controller Detection**: Monitors gamepad hardware attachments via [InputManager.InputDeviceListener].
  * - **Live Telemetry**: Real-time interactive preview of [KinematicRadialHUDView] reflecting stick aiming and layers.
- * - **Guided Setup**: 3-step setup flow for IME enablement, keyboard selection, and floating HUD overlay.
+ * - **Guided Setup**: 3-step setup flow for IME enablement, keyboard selection, and mouse clicks accessibility.
  * - **System Customization**: Configures radial symmetry, color scheme, button actions, and macro mappings.
  * - **Cheatsheet Reference**: Collapsible reference accordion for all controller button mappings.
  */
@@ -143,7 +143,7 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
         // Select / Share Button Spinner
         val spnSelectAction = findViewById<Spinner>(R.id.spn_select_action)
         spnSelectAction.adapter = actionAdapter
-        val currentSelectAction = prefs.getString("select_button_action", "toggle_hud")
+        val currentSelectAction = prefs.getString("select_button_action", "toggle_hud_hide_keyboard")
         val selectIdx = buttonActionKeys.indexOf(currentSelectAction).coerceAtLeast(0)
         spnSelectAction.setSelection(selectIdx)
 
@@ -445,10 +445,12 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             tvAccessibility?.setText(R.string.accessibility_status_enabled)
             tvAccessibility?.setTextColor(ContextCompat.getColor(this, R.color.accent_success))
             btnAccessibility?.setText(R.string.btn_clicks_configured)
+            btnAccessibility?.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.button_launch))
         } else {
             tvAccessibility?.setText(R.string.accessibility_status_disabled)
             tvAccessibility?.setTextColor(ContextCompat.getColor(this, R.color.accent_danger))
             btnAccessibility?.setText(R.string.btn_clicks_enable)
+            btnAccessibility?.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.button_step2))
         }
     }
 
@@ -466,13 +468,15 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             }
             "hide_keyboard" -> {
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
+                val token = currentFocus?.windowToken ?: window.decorView.windowToken
+                imm?.hideSoftInputFromWindow(token, 0)
                 tvLiveInput.text = getString(R.string.action_hide_keyboard_desc, buttonName)
             }
             "toggle_hud_hide_keyboard" -> {
                 toggleFloatingHUD()
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
+                val token = currentFocus?.windowToken ?: window.decorView.windowToken
+                imm?.hideSoftInputFromWindow(token, 0)
                 tvLiveInput.text = getString(R.string.action_toggle_hud_hide_desc, buttonName)
             }
             else -> { // "toggle_hud"
@@ -727,7 +731,7 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
-                val action = prefs.getString("select_button_action", "toggle_hud") ?: "toggle_hud"
+                val action = prefs.getString("select_button_action", "toggle_hud_hide_keyboard") ?: "toggle_hud_hide_keyboard"
                 executeSystemButtonAction("Select", action)
                 handled = true
             }

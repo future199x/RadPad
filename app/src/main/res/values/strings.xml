@@ -98,10 +98,10 @@
     <string name="btn_launch_floating_hud">📌 Launch Always-On Floating HUD</string>
 
     <!-- Accessibility Status & Button -->
-    <string name="accessibility_status_enabled">✓ System Clicks: Enabled</string>
-    <string name="accessibility_status_disabled">⚠️ System Clicks: Disabled</string>
-    <string name="btn_clicks_configured">Configured</string>
-    <string name="btn_clicks_enable">Enable Clicks</string>
+    <string name="accessibility_status_enabled">✓ System Clicks &amp; Gestures: Active</string>
+    <string name="accessibility_status_disabled">⚠️ System Clicks: Tap Step 2 above to enable Accessibility Service</string>
+    <string name="btn_clicks_configured">✓ Step 2: Mouse Clicks Enabled</string>
+    <string name="btn_clicks_enable">Step 2: Enable Mouse Clicks (Accessibility)</string>
 
     <!-- Controller Status Telemetry -->
     <string name="status_gamepad_ready">🎮 Gamepad Ready: %1$s</string>
