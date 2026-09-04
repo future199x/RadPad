@@ -129,11 +129,12 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
 
         // Button Action Spinners (Select and Start)
         val buttonActions = arrayOf(
-            getString(R.string.action_name_toggle_hud),
+            getString(R.string.action_name_escape),
             getString(R.string.action_name_hide_keyboard),
+            getString(R.string.action_name_toggle_hud),
             getString(R.string.action_name_toggle_hud_hide_keyboard)
         )
-        val buttonActionKeys = arrayOf("toggle_hud", "hide_keyboard", "toggle_hud_hide_keyboard")
+        val buttonActionKeys = arrayOf("escape", "hide_keyboard", "toggle_hud", "toggle_hud_hide_keyboard")
 
         val actionAdapter = ArrayAdapter(this, R.layout.item_spinner, buttonActions).apply {
             setDropDownViewResource(R.layout.item_spinner_dropdown)
@@ -157,7 +158,7 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
         // Start / Options Button Spinner
         val spnStartAction = findViewById<Spinner>(R.id.spn_start_action)
         spnStartAction.adapter = actionAdapter
-        val currentStartAction = prefs.getString("start_button_action", "hide_keyboard")
+        val currentStartAction = prefs.getString("start_button_action", "escape")
         val startIdx = buttonActionKeys.indexOf(currentStartAction).coerceAtLeast(0)
         spnStartAction.setSelection(startIdx)
 
@@ -460,6 +461,9 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
 
     private fun executeSystemButtonAction(buttonName: String, actionKey: String) {
         when (actionKey) {
+            "escape" -> {
+                tvLiveInput.text = getString(R.string.action_escape_desc, buttonName)
+            }
             "hide_keyboard" -> {
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
@@ -587,19 +591,28 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
 
             if (hatX != lastHatX) {
                 if (hatX < -0.5f) {
-                    VirtualMouseManager.performLeftClick()
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = true)
                     tvLiveInput.setText(R.string.live_mouse_left_click)
-                } else if (hatX > 0.5f) {
-                    VirtualMouseManager.performRightClick()
+                } else if (lastHatX < -0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = false)
+                }
+
+                if (hatX > 0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = true)
                     tvLiveInput.setText(R.string.live_mouse_right_click)
+                } else if (lastHatX > 0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = false)
                 }
                 lastHatX = hatX
             }
 
             if (hatY != lastHatY) {
                 if (hatY < -0.5f) {
-                    VirtualMouseManager.performMiddleClick()
-                    tvLiveInput.setText(R.string.live_mouse_middle_click)
+                    VirtualMouseManager.scrollUp()
+                    tvLiveInput.setText(R.string.live_mouse_scroll_up)
+                } else if (hatY > 0.5f) {
+                    VirtualMouseManager.scrollDown()
+                    tvLiveInput.setText(R.string.live_mouse_scroll_down)
                 }
                 lastHatY = hatY
             }
@@ -704,6 +717,13 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
                 isCaps = (engine.currentButtonMask and InputEngine.FLAG_CAPS_LOCK) != 0
                 handled = true
             }
+            KeyEvent.KEYCODE_BUTTON_THUMBR -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.MIDDLE, isDown = true)
+                    tvLiveInput.setText(R.string.live_mouse_middle_click)
+                }
+                handled = true
+            }
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = true
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
@@ -713,13 +733,13 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             }
             KeyEvent.KEYCODE_BUTTON_START -> {
                 val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
-                val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
+                val action = prefs.getString("start_button_action", "escape") ?: "escape"
                 executeSystemButtonAction("Start", action)
                 handled = true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (isR2ButtonDown || r2TriggerActive) {
-                    VirtualMouseManager.performLeftClick()
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = true)
                     tvLiveInput.setText(R.string.live_mouse_left_click)
                     handled = true
                 } else {
@@ -728,7 +748,7 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (isR2ButtonDown || r2TriggerActive) {
-                    VirtualMouseManager.performRightClick()
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = true)
                     tvLiveInput.setText(R.string.live_mouse_right_click)
                     handled = true
                 } else {
@@ -736,30 +756,50 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
                 }
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                if (isR2ButtonDown || r2TriggerActive) {
-                    VirtualMouseManager.performMiddleClick()
-                    tvLiveInput.setText(R.string.live_mouse_middle_click)
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.scrollUp()
+                    tvLiveInput.setText(R.string.live_mouse_scroll_up)
                     handled = true
                 } else {
                     onDpadAction(getString(R.string.dpad_up))
                 }
             }
-            KeyEvent.KEYCODE_DPAD_DOWN -> onDpadAction(getString(R.string.dpad_down))
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.scrollDown()
+                    tvLiveInput.setText(R.string.live_mouse_scroll_down)
+                    handled = true
+                } else {
+                    onDpadAction(getString(R.string.dpad_down))
+                }
+            }
             KeyEvent.KEYCODE_BUTTON_X -> {
                 tvLiveInput.setText(if (isShift) R.string.live_square_del else R.string.live_square_backspace)
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_A -> {
-                tvLiveInput.setText(R.string.live_cross_space)
-                handled = true
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = true)
+                    tvLiveInput.setText(R.string.live_mouse_left_click)
+                    handled = true
+                } else {
+                    tvLiveInput.setText(R.string.live_cross_space)
+                    handled = true
+                }
             }
             KeyEvent.KEYCODE_BUTTON_Y -> {
                 tvLiveInput.setText(R.string.live_triangle_enter)
                 handled = true
             }
             KeyEvent.KEYCODE_BUTTON_B -> {
-                tvLiveInput.setText(R.string.live_circle_tab)
-                handled = true
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = true)
+                    tvLiveInput.setText(R.string.live_mouse_right_click)
+                    handled = true
+                } else {
+                    tvLiveInput.setText(R.string.live_circle_tab)
+                    handled = true
+                }
             }
             else -> handled = false
         }
@@ -802,8 +842,38 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
                 tvLiveInput.setText(R.string.live_mouse_layer_deactivated)
                 handled = true
             }
-            KeyEvent.KEYCODE_DPAD_DOWN -> isCtrl = false
-            KeyEvent.KEYCODE_DPAD_LEFT -> isAlt = false
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    handled = true
+                } else {
+                    isCtrl = false
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = false)
+                    handled = true
+                } else {
+                    isAlt = false
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = false)
+                    handled = true
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    handled = true
+                }
+            }
+            KeyEvent.KEYCODE_BUTTON_THUMBR -> {
+                if (isR2ButtonDown || r2TriggerActive || VirtualMouseManager.isMouseLayerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.MIDDLE, isDown = false)
+                }
+                handled = true
+            }
             KeyEvent.KEYCODE_BUTTON_MODE -> isSuper = false
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 val prefs = getSharedPreferences("radpad_prefs", MODE_PRIVATE)
@@ -816,8 +886,22 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener, Them
             KeyEvent.KEYCODE_BUTTON_L1 -> {
                 handled = true
             }
-            KeyEvent.KEYCODE_BUTTON_B,
-            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_BUTTON_A -> {
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = false)
+                    handled = true
+                } else {
+                    handled = false
+                }
+            }
+            KeyEvent.KEYCODE_BUTTON_B -> {
+                if (isR2ButtonDown || r2TriggerActive) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = false)
+                    handled = true
+                } else {
+                    handled = false
+                }
+            }
             KeyEvent.KEYCODE_BUTTON_X,
             KeyEvent.KEYCODE_BUTTON_Y -> {
                 handled = false

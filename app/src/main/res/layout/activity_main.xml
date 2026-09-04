@@ -322,7 +322,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="Hide Keyboard (Default), Toggle HUD, or Toggle HUD + Hide Keyboard."
+                android:text="Escape (Default), Hide Keyboard, Toggle HUD, or Toggle HUD + Hide Keyboard."
                 android:textColor="@color/text_tertiary"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -348,7 +348,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Hold R2 to steer cursor with Right Stick. D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click."
+                android:text="Hold R2 to steer cursor with Right Stick. D-Pad Left = Left Click, D-Pad Right = Right Click, R3 = Middle Click, D-Pad Up/Down = Scroll Up/Down."
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
@@ -832,7 +832,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• Right Stick: Aim radial sectors (or move mouse cursor when holding R2)\n• Hold R2: Mouse Layer (Right Stick = Move Cursor, D-Pad Left = Left Click, D-Pad Right = Right Click, D-Pad Up = Middle Click)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• R3 (Right Stick Click): Escape (ESC)\n• Share / Select &amp; Start: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)"
+                android:text="• Right Stick: Aim radial sectors (or move mouse cursor when holding R2)\n• Hold R2: Mouse Layer (Right Stick = Move Cursor, D-Pad Left = Left Click, D-Pad Right = Right Click, R3 = Middle Click, D-Pad Up/Down = Scroll Up/Down)\n• Guide / Mode (Xbox/PS): Super / Windows Key (Win)\n• Start: Escape (ESC)\n• Share / Select: Choose in Settings (Toggle HUD, Hide Keyboard, Toggle HUD + Hide Keyboard)"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>

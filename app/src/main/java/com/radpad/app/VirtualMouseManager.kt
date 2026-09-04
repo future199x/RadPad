@@ -1,5 +1,7 @@
 package com.radpad.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
@@ -40,8 +42,18 @@ object VirtualMouseManager {
         fun onMouseLayerChanged(active: Boolean)
         /** Called whenever the cursor moves on screen. */
         fun onCursorMoved(x: Float, y: Float)
-        /** Called when a click gesture is dispatched. */
-        fun onMouseClicked(button: MouseButton, x: Float, y: Float)
+        /** Called when a click gesture is dispatched. Returns true if consumed by overlay. */
+        fun onMouseClicked(button: MouseButton, x: Float, y: Float): Boolean {
+            return false
+        }
+        /** Called when a mouse button transitions between down and up. Returns true if consumed by overlay. */
+        fun onMouseButtonState(button: MouseButton, isDown: Boolean, x: Float, y: Float): Boolean {
+            return false
+        }
+        /** Called when a scroll gesture is requested. Returns true if consumed by overlay. */
+        fun onMouseScroll(scrollUp: Boolean, x: Float, y: Float): Boolean {
+            return false
+        }
     }
 
     /**
@@ -50,6 +62,13 @@ object VirtualMouseManager {
     enum class MouseButton {
         LEFT, RIGHT, MIDDLE
     }
+
+    /** Overlay window dimension in DP providing ample padding so ripple waves and drop shadows are never cut off. */
+    const val CURSOR_SIZE_DP = 96f
+    /** Anchor offset in DP from top-left of the overlay window to the cursor arrow tip. */
+    const val CURSOR_TIP_OFFSET_DP = 48f
+    /** Maximum radius in DP for the click ripple wave. */
+    const val MAX_PULSE_RADIUS_DP = 28f
 
     private val listeners = CopyOnWriteArrayList<MouseStateListener>()
 
@@ -74,7 +93,13 @@ object VirtualMouseManager {
     private var cursorView: CursorPointerView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler: Handler? by lazy {
+        try {
+            Handler(Looper.getMainLooper())
+        } catch (_: Throwable) {
+            null
+        }
+    }
     private var isLoopRunning = false
     private var lastFrameTime = 0L
 
@@ -128,6 +153,12 @@ object VirtualMouseManager {
         } else {
             stickX = 0f
             stickY = 0f
+            isLeftDown = false
+            isRightDown = false
+            isMiddleDown = false
+            leftConsumedByOverlay = false
+            rightConsumedByOverlay = false
+            middleConsumedByOverlay = false
             stopKinematicLoop()
             // Keep cursor briefly visible or hide
             showCursor(false)
@@ -155,8 +186,8 @@ object VirtualMouseManager {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
         val density = context.resources.displayMetrics.density
-        val tipOffset = 10f * density
-        val sizePx = (44 * density).toInt()
+        val tipOffset = CURSOR_TIP_OFFSET_DP * density
+        val sizePx = (CURSOR_SIZE_DP * density).toInt()
 
         layoutParams = WindowManager.LayoutParams(
             sizePx,
@@ -224,7 +255,7 @@ object VirtualMouseManager {
                 }
             }
 
-            mainHandler.postDelayed(this, 16)
+            mainHandler?.postDelayed(this, 16)
         }
     }
 
@@ -232,12 +263,12 @@ object VirtualMouseManager {
         if (isLoopRunning) return
         isLoopRunning = true
         lastFrameTime = SystemClock.uptimeMillis()
-        mainHandler.post(frameRunnable)
+        mainHandler?.post(frameRunnable)
     }
 
     private fun stopKinematicLoop() {
         isLoopRunning = false
-        mainHandler.removeCallbacks(frameRunnable)
+        mainHandler?.removeCallbacks(frameRunnable)
     }
 
     private fun updateCursorPosition() {
@@ -245,7 +276,7 @@ object VirtualMouseManager {
         val params = layoutParams ?: return
         val wm = windowManager ?: return
 
-        val tipOffset = 10f * view.context.resources.displayMetrics.density
+        val tipOffset = CURSOR_TIP_OFFSET_DP * view.context.resources.displayMetrics.density
         params.x = (cursorX - tipOffset).toInt()
         params.y = (cursorY - tipOffset).toInt()
         try {
@@ -255,13 +286,122 @@ object VirtualMouseManager {
         }
     }
 
+    private var isLeftDown = false
+    private var isRightDown = false
+    private var isMiddleDown = false
+    private var leftConsumedByOverlay = false
+    private var rightConsumedByOverlay = false
+    private var middleConsumedByOverlay = false
+    private var leftDownTime = 0L
+
+    /**
+     * Handles hardware button down/up transitions for virtual mouse clicks and dragging.
+     * Returns true if consumed by an overlay or handled.
+     */
+    fun onMouseButton(button: MouseButton, isDown: Boolean): Boolean {
+        when (button) {
+            MouseButton.LEFT -> {
+                if (isLeftDown == isDown) return leftConsumedByOverlay
+                isLeftDown = isDown
+                if (isDown) {
+                    leftDownTime = SystemClock.uptimeMillis()
+                    cursorView?.triggerClickPulse(MouseButton.LEFT)
+                    var consumed = false
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.LEFT, true, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    leftConsumedByOverlay = consumed
+                    return consumed
+                } else {
+                    var consumed = leftConsumedByOverlay
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.LEFT, false, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    val wasConsumed = leftConsumedByOverlay
+                    leftConsumedByOverlay = false
+                    if (wasConsumed || consumed) {
+                        return true
+                    }
+                    val duration = (SystemClock.uptimeMillis() - leftDownTime).coerceIn(40L, 300L)
+                    return RadPadAccessibilityService.dispatchTap(cursorX, cursorY, duration)
+                }
+            }
+            MouseButton.RIGHT -> {
+                if (isRightDown == isDown) return rightConsumedByOverlay
+                isRightDown = isDown
+                if (isDown) {
+                    cursorView?.triggerClickPulse(MouseButton.RIGHT)
+                    var consumed = false
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.RIGHT, true, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    rightConsumedByOverlay = consumed
+                    return consumed
+                } else {
+                    var consumed = rightConsumedByOverlay
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.RIGHT, false, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    val wasConsumed = rightConsumedByOverlay
+                    rightConsumedByOverlay = false
+                    if (wasConsumed || consumed) {
+                        return true
+                    }
+                    return performRightClick(triggerPulse = false)
+                }
+            }
+            MouseButton.MIDDLE -> {
+                if (isMiddleDown == isDown) return middleConsumedByOverlay
+                isMiddleDown = isDown
+                if (isDown) {
+                    cursorView?.triggerClickPulse(MouseButton.MIDDLE)
+                    var consumed = false
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.MIDDLE, true, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    middleConsumedByOverlay = consumed
+                    return consumed
+                } else {
+                    var consumed = middleConsumedByOverlay
+                    for (l in listeners) {
+                        if (l.onMouseButtonState(MouseButton.MIDDLE, false, cursorX, cursorY)) {
+                            consumed = true
+                        }
+                    }
+                    val wasConsumed = middleConsumedByOverlay
+                    middleConsumedByOverlay = false
+                    if (wasConsumed || consumed) {
+                        return true
+                    }
+                    return performMiddleClick(triggerPulse = false)
+                }
+            }
+        }
+    }
+
     /**
      * Injects a primary left-click tap at current pointer coordinates via [RadPadAccessibilityService.dispatchTap].
      */
     fun performLeftClick(): Boolean {
         cursorView?.triggerClickPulse(MouseButton.LEFT)
+        var consumed = false
         for (l in listeners) {
-            l.onMouseClicked(MouseButton.LEFT, cursorX, cursorY)
+            if (l.onMouseClicked(MouseButton.LEFT, cursorX, cursorY)) {
+                consumed = true
+            }
+        }
+        if (consumed) {
+            return true
         }
         return RadPadAccessibilityService.dispatchTap(cursorX, cursorY, 50L)
     }
@@ -269,10 +409,18 @@ object VirtualMouseManager {
     /**
      * Injects a secondary right-click action (long-press tap for context menus, or global Back fallback).
      */
-    fun performRightClick(): Boolean {
-        cursorView?.triggerClickPulse(MouseButton.RIGHT)
+    fun performRightClick(triggerPulse: Boolean = true): Boolean {
+        if (triggerPulse) {
+            cursorView?.triggerClickPulse(MouseButton.RIGHT)
+        }
+        var consumed = false
         for (l in listeners) {
-            l.onMouseClicked(MouseButton.RIGHT, cursorX, cursorY)
+            if (l.onMouseClicked(MouseButton.RIGHT, cursorX, cursorY)) {
+                consumed = true
+            }
+        }
+        if (consumed) {
+            return true
         }
         // Long press for context menu, or fallback to global back
         val tapped = RadPadAccessibilityService.dispatchTap(cursorX, cursorY, 550L)
@@ -285,10 +433,18 @@ object VirtualMouseManager {
     /**
      * Injects a middle-click action (medium tap, or global Recents overview fallback).
      */
-    fun performMiddleClick(): Boolean {
-        cursorView?.triggerClickPulse(MouseButton.MIDDLE)
+    fun performMiddleClick(triggerPulse: Boolean = true): Boolean {
+        if (triggerPulse) {
+            cursorView?.triggerClickPulse(MouseButton.MIDDLE)
+        }
+        var consumed = false
         for (l in listeners) {
-            l.onMouseClicked(MouseButton.MIDDLE, cursorX, cursorY)
+            if (l.onMouseClicked(MouseButton.MIDDLE, cursorX, cursorY)) {
+                consumed = true
+            }
+        }
+        if (consumed) {
+            return true
         }
         val tapped = RadPadAccessibilityService.dispatchTap(cursorX, cursorY, 100L)
         if (!tapped) {
@@ -298,12 +454,36 @@ object VirtualMouseManager {
     }
 
     /**
+     * Dispatches a synthetic scroll-up gesture at current pointer coordinates.
+     */
+    fun scrollUp(): Boolean {
+        for (l in listeners) {
+            if (l.onMouseScroll(scrollUp = true, cursorX, cursorY)) {
+                return true
+            }
+        }
+        return RadPadAccessibilityService.dispatchScroll(cursorX, cursorY, scrollUp = true)
+    }
+
+    /**
+     * Dispatches a synthetic scroll-down gesture at current pointer coordinates.
+     */
+    fun scrollDown(): Boolean {
+        for (l in listeners) {
+            if (l.onMouseScroll(scrollUp = false, cursorX, cursorY)) {
+                return true
+            }
+        }
+        return RadPadAccessibilityService.dispatchScroll(cursorX, cursorY, scrollUp = false)
+    }
+
+    /**
      * Custom overlay view rendering a crisp pointer arrow with drop shadow and click ripple.
      */
     private class CursorPointerView(context: Context) : View(context) {
         private val density = context.resources.displayMetrics.density
-        private val tipX = 10f * density
-        private val tipY = 10f * density
+        private val tipX = CURSOR_TIP_OFFSET_DP * density
+        private val tipY = CURSOR_TIP_OFFSET_DP * density
         private val arrowPath = Path()
         private val arrowFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
@@ -318,12 +498,17 @@ object VirtualMouseManager {
         }
         private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 3f * density
+            strokeCap = Paint.Cap.ROUND
         }
 
-        private var pulseRadius = 0f
-        private var pulseAlpha = 0
-        private var pulseColor = 0xFFA6E3A1.toInt()
+        private class RipplePulse(
+            val color: Int,
+            var radius: Float = 0f,
+            var alpha: Int = 0,
+            var strokeWidth: Float = 0f
+        )
+
+        private val activeRipples = mutableListOf<RipplePulse>()
 
         init {
             setLayerType(LAYER_TYPE_SOFTWARE, null)
@@ -341,20 +526,47 @@ object VirtualMouseManager {
         }
 
         fun triggerClickPulse(button: MouseButton) {
-            pulseColor = when (button) {
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                post { triggerClickPulse(button) }
+                return
+            }
+
+            val color = when (button) {
                 MouseButton.LEFT -> 0xFFA6E3A1.toInt()    // Soft green
                 MouseButton.RIGHT -> 0xFF89B4FA.toInt()   // Soft blue
                 MouseButton.MIDDLE -> 0xFFF9E2AF.toInt()  // Soft gold
             }
+
+            // Cap simultaneous ripples to avoid excessive drawing
+            if (activeRipples.size >= 4) {
+                activeRipples.removeAt(0)
+            }
+
+            val ripple = RipplePulse(color)
+            activeRipples.add(ripple)
+
+            val maxRadius = MAX_PULSE_RADIUS_DP * density
             val anim = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 250
-                interpolator = DecelerateInterpolator()
+                duration = 280
+                interpolator = DecelerateInterpolator(1.2f)
                 addUpdateListener { va ->
                     val fraction = va.animatedFraction
-                    pulseRadius = fraction * 20f * density
-                    pulseAlpha = ((1f - fraction) * 255).toInt()
+                    ripple.radius = (3f * density) + fraction * (maxRadius - 3f * density)
+                    val rawAlpha = if (fraction < 0.15f) {
+                        (fraction / 0.15f) * 220f
+                    } else {
+                        (1f - (fraction - 0.15f) / 0.85f).toDouble().pow(1.5).toFloat() * 220f
+                    }
+                    ripple.alpha = rawAlpha.toInt().coerceIn(0, 255)
+                    ripple.strokeWidth = (2.6f - fraction * 1.0f) * density
                     invalidate()
                 }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        activeRipples.remove(ripple)
+                        invalidate()
+                    }
+                })
             }
             anim.start()
         }
@@ -362,11 +574,15 @@ object VirtualMouseManager {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            // Draw ripple pulse centered precisely at arrow tip
-            if (pulseAlpha > 0) {
-                pulsePaint.color = pulseColor
-                pulsePaint.alpha = pulseAlpha
-                canvas.drawCircle(tipX, tipY, pulseRadius, pulsePaint)
+            // Draw ripple wave pulses centered precisely at arrow tip
+            for (i in 0 until activeRipples.size) {
+                val ripple = activeRipples.getOrNull(i) ?: continue
+                if (ripple.alpha > 0) {
+                    pulsePaint.color = ripple.color
+                    pulsePaint.alpha = ripple.alpha
+                    pulsePaint.strokeWidth = ripple.strokeWidth
+                    canvas.drawCircle(tipX, tipY, ripple.radius, pulsePaint)
+                }
             }
 
             // Draw arrow pointer

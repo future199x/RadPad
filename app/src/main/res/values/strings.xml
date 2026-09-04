@@ -17,11 +17,15 @@
     <string name="hud_mouse_left_click">Mouse: Left Click</string>
     <string name="hud_mouse_right_click">Mouse: Right Click</string>
     <string name="hud_mouse_middle_click">Mouse: Middle Click</string>
-    <string name="hud_mouse_layer_status">MOUSE LAYER (Aim Stick: Move | D-Pad: Clicks)</string>
-    <string name="hud_mouse_dpad_help">D-Pad: ← Left Click | → Right Click | ↑ Mid Click</string>
+    <string name="hud_mouse_scroll_up">Mouse: Scroll Up</string>
+    <string name="hud_mouse_scroll_down">Mouse: Scroll Down</string>
+    <string name="hud_mouse_layer_status">MOUSE LAYER (Aim Stick: Move | D-Pad: Clicks/Scroll)</string>
+    <string name="hud_mouse_dpad_help">D-Pad: ← Left | → Right | ↑/↓ Scroll | R3: Mid</string>
     <string name="live_mouse_left_click">Mouse: Left Click</string>
     <string name="live_mouse_right_click">Mouse: Right Click</string>
     <string name="live_mouse_middle_click">Mouse: Middle Click</string>
+    <string name="live_mouse_scroll_up">Mouse: Scroll Up</string>
+    <string name="live_mouse_scroll_down">Mouse: Scroll Down</string>
 
     <!-- Cursor Navigation -->
     <string name="hud_cursor_status">Cursor: %1$s</string>
@@ -80,9 +84,11 @@
     <string name="chevron_up">▲</string>
 
     <!-- MainActivity Actions & Spinners -->
+    <string name="action_name_escape">Escape (ESC)</string>
     <string name="action_name_toggle_hud">Toggle HUD</string>
     <string name="action_name_hide_keyboard">Hide Keyboard</string>
     <string name="action_name_toggle_hud_hide_keyboard">Toggle HUD + Hide Keyboard</string>
+    <string name="action_escape_desc">%1$s Button -> Action: Escape (ESC)</string>
     <string name="action_hide_keyboard_desc">%1$s Button -> Action: Hide Keyboard</string>
     <string name="action_toggle_hud_hide_desc">%1$s Button -> Action: Toggle HUD + Hide Keyboard</string>
     <string name="action_toggle_hud_desc">%1$s Button -> Action: Toggle HUD</string>

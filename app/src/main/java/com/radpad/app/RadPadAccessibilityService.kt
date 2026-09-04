@@ -46,6 +46,63 @@ class RadPadAccessibilityService : AccessibilityService() {
             }, null)
         }
 
+        private var isScrollInProgress = false
+
+        /**
+         * Dispatches a synthetic scroll gesture at pointer coordinates ([x], [y]).
+         * If [scrollUp] is true, swipes downward to reveal content above (scrolling up).
+         * If [scrollUp] is false, swipes upward to reveal content below (scrolling down).
+         */
+        fun dispatchScroll(
+            x: Float,
+            y: Float,
+            scrollUp: Boolean,
+            durationMs: Long = 120L,
+            onComplete: (() -> Unit)? = null
+        ): Boolean {
+            val service = instance ?: return false
+            if (isScrollInProgress) return false
+
+            val metrics = service.resources.displayMetrics
+            val density = metrics.density
+            val screenWidth = metrics.widthPixels.toFloat()
+            val screenHeight = metrics.heightPixels.toFloat()
+            val margin = 40f * density
+            val maxScroll = (200f * density).coerceAtMost((screenHeight - 2 * margin) / 2f)
+
+            val clampedX = x.coerceIn(margin, screenWidth - margin)
+            val (startY, endY) = if (scrollUp) {
+                // Swiping downward scrolls content up (revealing content above)
+                val from = (y - maxScroll / 2f).coerceIn(margin, screenHeight - margin - maxScroll)
+                val to = from + maxScroll
+                Pair(from, to)
+            } else {
+                // Swiping upward scrolls content down (revealing content below)
+                val from = (y + maxScroll / 2f).coerceIn(margin + maxScroll, screenHeight - margin)
+                val to = from - maxScroll
+                Pair(from, to)
+            }
+
+            val path = Path().apply {
+                moveTo(clampedX, startY)
+                lineTo(clampedX, endY)
+            }
+            val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
+            val gesture = GestureDescription.Builder().addStroke(stroke).build()
+
+            isScrollInProgress = true
+            return service.dispatchGesture(gesture, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    isScrollInProgress = false
+                    onComplete?.invoke()
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    isScrollInProgress = false
+                }
+            }, null)
+        }
+
         /**
          * Dispatches the Android system Back navigation action.
          */

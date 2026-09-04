@@ -102,19 +102,28 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
             if (hatX != lastHatX) {
                 if (hatX < -0.5f) {
-                    VirtualMouseManager.performLeftClick()
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = true)
                     hudStatus?.setText(R.string.hud_mouse_left_click)
-                } else if (hatX > 0.5f) {
-                    VirtualMouseManager.performRightClick()
+                } else if (lastHatX < -0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = false)
+                }
+
+                if (hatX > 0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = true)
                     hudStatus?.setText(R.string.hud_mouse_right_click)
+                } else if (lastHatX > 0.5f) {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = false)
                 }
                 lastHatX = hatX
             }
 
             if (hatY != lastHatY) {
                 if (hatY < -0.5f) {
-                    VirtualMouseManager.performMiddleClick()
-                    hudStatus?.setText(R.string.hud_mouse_middle_click)
+                    VirtualMouseManager.scrollUp()
+                    hudStatus?.setText(R.string.hud_mouse_scroll_up)
+                } else if (hatY > 0.5f) {
+                    VirtualMouseManager.scrollDown()
+                    hudStatus?.setText(R.string.hud_mouse_scroll_down)
                 }
                 lastHatY = hatY
             }
@@ -183,19 +192,35 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
 
         if (engine.isMouseLayerActive) {
             when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    VirtualMouseManager.performLeftClick()
-                    hudStatus?.setText(R.string.hud_mouse_left_click)
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BUTTON_A -> {
+                    if (event.repeatCount == 0) {
+                        VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = true)
+                        hudStatus?.setText(R.string.hud_mouse_left_click)
+                    }
                     return true
                 }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    VirtualMouseManager.performRightClick()
-                    hudStatus?.setText(R.string.hud_mouse_right_click)
+                KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_B -> {
+                    if (event.repeatCount == 0) {
+                        VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = true)
+                        hudStatus?.setText(R.string.hud_mouse_right_click)
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_BUTTON_THUMBR -> {
+                    if (event.repeatCount == 0) {
+                        VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.MIDDLE, isDown = true)
+                        hudStatus?.setText(R.string.hud_mouse_middle_click)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    VirtualMouseManager.performMiddleClick()
-                    hudStatus?.setText(R.string.hud_mouse_middle_click)
+                    VirtualMouseManager.scrollUp()
+                    hudStatus?.setText(R.string.hud_mouse_scroll_up)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    VirtualMouseManager.scrollDown()
+                    hudStatus?.setText(R.string.hud_mouse_scroll_down)
                     return true
                 }
             }
@@ -291,9 +316,8 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 return true
             }
 
-            // R3: Escape
+            // R3: No-op when not in mouse mode
             KeyEvent.KEYCODE_BUTTON_THUMBR -> {
-                sendDownUpKeyEvents(KeyEvent.KEYCODE_ESCAPE)
                 return true
             }
 
@@ -316,9 +340,9 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
                 return true
             }
 
-            // Options / Start: Close Keyboard / Toggle HUD
+            // Options / Start: Escape (ESC) by default (or configured action)
             KeyEvent.KEYCODE_BUTTON_START -> {
-                val action = prefs.getString("start_button_action", "hide_keyboard") ?: "hide_keyboard"
+                val action = prefs.getString("start_button_action", "escape") ?: "escape"
                 executeSystemButtonAction(action)
                 updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
                 return true
@@ -368,6 +392,10 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
      */
     private fun executeSystemButtonAction(actionKey: String) {
         when (actionKey) {
+            "escape" -> {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_ESCAPE)
+                hudStatus?.text = getString(R.string.hud_emitted_format, "Esc")
+            }
             "hide_keyboard" -> {
                 requestHideSelf(0)
             }
@@ -390,6 +418,28 @@ class ControllerIME : InputMethodService(), ThemeManager.ThemeListener {
             engine.onKeyEvent(keyCode, isDown = false)
             VirtualMouseManager.setMouseLayerActive(this, false)
             updateHud(lastEvent = null, x = lastStickX, y = lastStickY)
+            return true
+        }
+        if (engine.isMouseLayerActive) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BUTTON_A -> {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.LEFT, isDown = false)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_B -> {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.RIGHT, isDown = false)
+                    return true
+                }
+                KeyEvent.KEYCODE_BUTTON_THUMBR -> {
+                    VirtualMouseManager.onMouseButton(VirtualMouseManager.MouseButton.MIDDLE, isDown = false)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    return true
+                }
+            }
+        }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_THUMBR) {
             return true
         }
         val handled = engine.onKeyEvent(keyCode, isDown = false)

@@ -48,6 +48,13 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
     private var radialHUD: KinematicRadialHUDView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
+    private var isDraggingWithMouse = false
+    private var hasMovedDuringDrag = false
+    private var dragStartCursorX = 0f
+    private var dragStartCursorY = 0f
+    private var dragStartHudX = 0
+    private var dragStartHudY = 0
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -135,6 +142,15 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
 
         val layoutType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
+        val (savedX, savedY) = FloatingHUDManager.loadHudPosition(this)
+        val metrics = resources.displayMetrics
+        val screenW = metrics.widthPixels
+        val screenH = metrics.heightPixels
+        val estW = (190 * metrics.density).toInt()
+        val estH = (240 * metrics.density).toInt()
+        val clampedX = savedX.coerceIn(0, (screenW - estW).coerceAtLeast(0))
+        val clampedY = savedY.coerceIn(0, (screenH - estH).coerceAtLeast(0))
+
         layoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -145,8 +161,8 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 80
-            y = 160
+            x = clampedX
+            y = clampedY
         }
 
         header?.setOnTouchListener(object : View.OnTouchListener {
@@ -176,6 +192,7 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                     }
                     MotionEvent.ACTION_UP -> {
                         v?.performClick()
+                        FloatingHUDManager.saveHudPosition(this@FloatingHUDService, params.x, params.y)
                         return true
                     }
                 }
@@ -285,9 +302,60 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
         }
     }
 
+    private fun isCursorOverCloseBtn(cx: Float, cy: Float): Boolean {
+        val btn = closeBtn ?: return false
+        val loc = IntArray(2)
+        btn.getLocationOnScreen(loc)
+        return cx >= loc[0] && cx <= (loc[0] + btn.width) &&
+               cy >= loc[1] && cy <= (loc[1] + btn.height)
+    }
+
+    private fun isCursorOverHud(cx: Float, cy: Float): Boolean {
+        val params = layoutParams ?: return false
+        val v = floatingView ?: return false
+        val w = if (v.width > 0) v.width else (190 * resources.displayMetrics.density).toInt()
+        val h = if (v.height > 0) v.height else (240 * resources.displayMetrics.density).toInt()
+        return cx >= params.x && cx <= (params.x + w) &&
+               cy >= params.y && cy <= (params.y + h)
+    }
+
+    private fun applyDragHighlight(dragging: Boolean) {
+        val theme = ThemeManager.currentTheme
+        val cardBg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(20f)
+            setColor(theme.cardBackground)
+            if (dragging) {
+                setStroke(dpToPx(3f).toInt(), theme.activeSliceStroke)
+            } else {
+                setStroke(dpToPx(1.5f).toInt(), theme.ringStroke)
+            }
+        }
+        floatingContainer?.background = cardBg
+        if (dragging) {
+            tvTitle?.text = "✥ DRAGGING"
+        } else if (VirtualMouseManager.isMouseLayerActive) {
+            tvTitle?.setText(R.string.floating_title_mouse_mode)
+        } else {
+            tvTitle?.setText(R.string.floating_title_radpad)
+        }
+    }
+
+    private fun finishMouseDrag() {
+        if (!isDraggingWithMouse) return
+        isDraggingWithMouse = false
+        hasMovedDuringDrag = false
+        val params = layoutParams ?: return
+        FloatingHUDManager.saveHudPosition(this, params.x, params.y)
+        applyDragHighlight(false)
+    }
+
     private val mouseListener = object : VirtualMouseManager.MouseStateListener {
         override fun onMouseLayerChanged(active: Boolean) {
             mainHandler.post {
+                if (!active && isDraggingWithMouse) {
+                    finishMouseDrag()
+                }
                 if (active) {
                     tvMode?.visibility = View.GONE
                     tvTitle?.setText(R.string.floating_title_mouse_mode)
@@ -298,8 +366,107 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
                 radialHUD?.invalidate()
             }
         }
-        override fun onCursorMoved(x: Float, y: Float) {}
-        override fun onMouseClicked(button: VirtualMouseManager.MouseButton, x: Float, y: Float) {}
+
+        override fun onCursorMoved(x: Float, y: Float) {
+            if (!isDraggingWithMouse) return
+            val params = layoutParams ?: return
+            val dx = (x - dragStartCursorX).toInt()
+            val dy = (y - dragStartCursorY).toInt()
+            if (!hasMovedDuringDrag && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+                hasMovedDuringDrag = true
+            }
+
+            val metrics = resources.displayMetrics
+            val v = floatingView ?: return
+            val hudW = if (v.width > 0) v.width else (190 * metrics.density).toInt()
+            val hudH = if (v.height > 0) v.height else (240 * metrics.density).toInt()
+            val maxW = (metrics.widthPixels - hudW).coerceAtLeast(0)
+            val maxH = (metrics.heightPixels - hudH).coerceAtLeast(0)
+
+            params.x = (dragStartHudX + dx).coerceIn(0, maxW)
+            params.y = (dragStartHudY + dy).coerceIn(0, maxH)
+
+            mainHandler.post {
+                try {
+                    windowManager?.updateViewLayout(floatingView, params)
+                } catch (_: Exception) {}
+            }
+        }
+
+        override fun onMouseButtonState(
+            button: VirtualMouseManager.MouseButton,
+            isDown: Boolean,
+            x: Float,
+            y: Float
+        ): Boolean {
+            if (button != VirtualMouseManager.MouseButton.LEFT) {
+                if (isDraggingWithMouse) {
+                    mainHandler.post { finishMouseDrag() }
+                    return true
+                }
+                return false
+            }
+
+            if (isDown) {
+                if (isDraggingWithMouse) {
+                    mainHandler.post { finishMouseDrag() }
+                    return true
+                }
+
+                if (isCursorOverCloseBtn(x, y)) {
+                    mainHandler.post { stopSelf() }
+                    return true
+                }
+
+                if (isCursorOverHud(x, y)) {
+                    val params = layoutParams ?: return true
+                    isDraggingWithMouse = true
+                    hasMovedDuringDrag = false
+                    dragStartCursorX = x
+                    dragStartCursorY = y
+                    dragStartHudX = params.x
+                    dragStartHudY = params.y
+                    mainHandler.post { applyDragHighlight(true) }
+                    return true
+                }
+                return false
+            } else {
+                if (isDraggingWithMouse) {
+                    if (hasMovedDuringDrag) {
+                        mainHandler.post { finishMouseDrag() }
+                    }
+                    return true
+                }
+                return false
+            }
+        }
+
+        override fun onMouseClicked(
+            button: VirtualMouseManager.MouseButton,
+            x: Float,
+            y: Float
+        ): Boolean {
+            if (isDraggingWithMouse) {
+                mainHandler.post { finishMouseDrag() }
+                return true
+            }
+            if (isCursorOverCloseBtn(x, y)) {
+                mainHandler.post { stopSelf() }
+                return true
+            }
+            if (isCursorOverHud(x, y)) {
+                val params = layoutParams ?: return true
+                isDraggingWithMouse = true
+                hasMovedDuringDrag = false
+                dragStartCursorX = x
+                dragStartCursorY = y
+                dragStartHudX = params.x
+                dragStartHudY = params.y
+                mainHandler.post { applyDragHighlight(true) }
+                return true
+            }
+            return false
+        }
     }
 
     /**
@@ -307,6 +474,9 @@ class FloatingHUDService : Service(), FloatingHUDManager.Listener, ThemeManager.
      */
     override fun onDestroy() {
         super.onDestroy()
+        if (isDraggingWithMouse) {
+            finishMouseDrag()
+        }
         isRunning = false
         FloatingHUDManager.notifyFloaterStateChanged(false)
         VirtualMouseManager.unregister(mouseListener)

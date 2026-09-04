@@ -23,9 +23,14 @@ Instead of struggling with a touchscreen keyboard or awkward on-screen letter gr
   - Press **R1** to select a sector, click center **R1** or hold **R2** to toggle 2nd tier pages, and press **L1** to universally drop back to the Base layer.
 - **Always-On Draggable Floating HUD**:
   - A lightweight, draggable overlay (`SYSTEM_ALERT_WINDOW`) that renders persistently over games, emulators, and full-screen applications, showing stick position, active modifiers, and layer targeting even when the soft keyboard is hidden.
-- **Virtual Mouse Mode & Rootless System Clicks**:
-  - Hold **R2** to seamlessly convert the Right Stick into an analog mouse pointer.
-  - Navigate with high-resolution acceleration and trigger Left Click (D-Pad Left), Right Click (D-Pad Right), or Middle Click (D-Pad Up) system-wide via the built-in `AccessibilityService`.
+- **Virtual Mouse Mode & Rootless System Gestures**:
+  - Hold **R2** to seamlessly convert the Right Stick into an analog mouse pointer with precision kinematic velocity integration.
+  - Full pointer controls: **Left Click** (D-Pad Left / Cross), **Right Click** (D-Pad Right / Circle), and **Middle Click** (R3 / Right Stick Click).
+  - **D-Pad Scrolling**: Tap or hold **D-Pad Up** to scroll up, and **D-Pad Down** to scroll down across any app or web page via synthetic accessibility swipes.
+  - **Fluid Click Ripple Animation**: Modern multi-ripple expanding wave animations with smooth energy dissipation and ample bounds padding so click circles never clip against window edges.
+- **Dedicated Start & System Controls**:
+  - **Start / Options Button**: Emits **Escape (ESC)** by default (customizable in Settings to Hide Keyboard or Toggle HUD).
+  - **R3 (Right Stick Click)**: Triggers Middle Click in Mouse Mode, and safely no-ops outside Mouse Mode.
 - **Custom Macro Engine**:
   - 8 configurable radial macro slots with presets (Copy, Paste, Cut, Select All, Undo, Redo, Win+D, Alt+Tab, Task Manager) plus full custom support for complex keyboard combinations (`ctrl+shift+z`, `win+shift+s`, `alt+f4`) and arbitrary text injection (`text:hello`).
 - **Symmetric & Asymmetric Geometry**:
@@ -48,22 +53,22 @@ Instead of struggling with a touchscreen keyboard or awkward on-screen letter gr
 | **Left Stick Tilt Up** | **SHIFT** | Hold for uppercase letters and secondary symbol set |
 | **Left Stick Flick Right** | **Standalone Windows / Super** | Quick flick and release emits standalone Super (opens App Launcher / Start Menu) |
 | **L3 (Left Stick Click)** | **Caps Lock Toggle** | Toggles persistent Caps Lock (`[CAPS]` indicator illuminates) |
-| **R3 (Right Stick Click)** | **Escape (ESC)** | Emits standalone Escape key event |
+| **R3 (Right Stick Click)** | **Middle Click (Mouse Mode)** | Dispatches Middle Click in Mouse Mode; unmapped / no-op outside Mouse Mode |
 | **R1 (Right Bumper)** | **Select / Commit Character** | Enters sector from Base, types character in sublayer, or executes macro |
 | **Center R1** | **Toggle 2nd Page** | Center stick inside `Q-Z`, `SYM`, `NUM`, or `FN` and tap R1 to toggle page |
 | **L1 (Left Bumper)** | **Return to Base Layer** | Universally steps back one layer level (Page 2 $\rightarrow$ Page 1 $\rightarrow$ Base) |
 | **R2 (Right Trigger)** | **Hold for 2nd Tier / Mouse Mode** | Shifts to 2nd tier while held; holding activates Virtual Mouse Mode |
 | **L2 (Left Trigger)** | **Shift Modifier** | Hold for uppercase alphabet and alternate symbol characters |
 | **▢ (Square / X)** | **Backspace / Forward Delete** | Single tap = Backspace. **Hold L2 / Shift** = True Forward Delete (`DEL`) |
-| **✕ (Cross / A)** | **Space** | Types space character (supports Win/Ctrl/Alt+Space) |
+| **✕ (Cross / A)** | **Space / Mouse Left Click** | Types space character; Left click in mouse mode |
 | **△ (Triangle / Y)** | **Enter / Newline** | Commits line / enter key (supports Win/Ctrl/Alt+Enter) |
-| **○ (Circle / B)** | **Tab** | Field navigation / indentation (supports Win/Alt/Ctrl+Tab) |
+| **○ (Circle / B)** | **Tab / Mouse Right Click** | Field navigation / tab; Right click in mouse mode |
 | **D-Pad Left** | **Cursor Left / Mouse Left Click** | Moves text cursor left (Snap left with Super); Left click in mouse mode |
 | **D-Pad Right** | **Cursor Right / Mouse Right Click**| Moves text cursor right (Snap right with Super); Right click in mouse mode |
-| **D-Pad Up** | **Cursor Up / Mouse Middle Click** | Moves text cursor up; Middle click in mouse mode |
-| **D-Pad Down** | **Cursor Down** | Moves text cursor down |
-| **Select / Share** | **Configurable Action** | Toggle HUD, Hide Keyboard, or Toggle HUD + Hide Keyboard |
-| **Start / Options** | **Configurable Action** | Toggle HUD, Hide Keyboard, or Toggle HUD + Hide Keyboard |
+| **D-Pad Up** | **Cursor Up / Scroll Up** | Moves text cursor up; Smooth vertical scroll up in mouse mode |
+| **D-Pad Down** | **Cursor Down / Scroll Down** | Moves text cursor down; Smooth vertical scroll down in mouse mode |
+| **Start / Options** | **Escape (ESC) (Default)** | Emits Escape key (customizable in Settings: Escape, Hide Keyboard, Toggle HUD) |
+| **Select / Share** | **Configurable Action** | Toggle HUD (Default), Hide Keyboard, Toggle HUD + Hide Keyboard, or Escape |
 
 ---
 

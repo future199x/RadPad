@@ -156,4 +156,44 @@ object FloatingHUDManager {
             true
         }
     }
+
+    const val PREFS_NAME = "radpad_prefs"
+    const val PREF_HUD_X = "floating_hud_x"
+    const val PREF_HUD_Y = "floating_hud_y"
+    const val DEFAULT_HUD_X = 80
+    const val DEFAULT_HUD_Y = 160
+
+    var savedHudX: Int = DEFAULT_HUD_X
+        private set
+    var savedHudY: Int = DEFAULT_HUD_Y
+        private set
+    private var isPosLoaded: Boolean = false
+
+    /**
+     * Loads the persisted floating HUD screen coordinates from shared preferences.
+     * Returns the cached or saved (x, y) coordinates.
+     */
+    fun loadHudPosition(context: android.content.Context): Pair<Int, Int> {
+        if (!isPosLoaded) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            savedHudX = prefs.getInt(PREF_HUD_X, DEFAULT_HUD_X)
+            savedHudY = prefs.getInt(PREF_HUD_Y, DEFAULT_HUD_Y)
+            isPosLoaded = true
+        }
+        return Pair(savedHudX, savedHudY)
+    }
+
+    /**
+     * Persists the floating HUD screen coordinates to shared preferences and caches them in memory.
+     */
+    fun saveHudPosition(context: android.content.Context, x: Int, y: Int) {
+        savedHudX = x
+        savedHudY = y
+        isPosLoaded = true
+        context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putInt(PREF_HUD_X, x)
+            .putInt(PREF_HUD_Y, y)
+            .apply()
+    }
 }
